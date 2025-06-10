@@ -34,9 +34,9 @@ garage_ai_assigner/
 1.  **Prerequisites:**
     * Python 3.7+
 
-2.  **Clone the Repository (Example):**
+2.  **Clone the Repository:**
     ```bash
-    git clone <your-repository-url>
+    git clone https://github.com/shah-darshit/garage-ai_assigner.git
     cd garage_ai_assigner
     ```
 
