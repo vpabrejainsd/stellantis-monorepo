@@ -13,8 +13,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 FLAT_FILE_EXCEL_PATH = os.path.join(DATA_DIR, 'generated_flat_job_history.xlsx')
 MAPPING_Excel_PATH = os.path.join(DATA_DIR, 'Job_Task_Mapping.xlsx')
-NUM_RECORDS = 250
+DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 ENGINEER_EXCEL_PATH = os.path.join(DATA_DIR, 'engineer_profiles.xlsx')
+NUM_RECORDS = 250
 
 TASKS_DATA = {
     'T001': {'name': 'Oil Change', 'time': 25},
@@ -52,6 +53,15 @@ JOB_TO_TASKS_MAPPING = {
 }
 
 available_jobs = list(JOB_TO_TASKS_MAPPING.keys())
+
+COLUMN_MAPPING = {
+    # Standard Name : [Possible Variation 1, Possible Variation 2, etc.]
+    'Engineer_Id': ['Assigned_Engineer_Id', 'engineer_id', 'Engineer ID', 'Engineer Id'],
+    'Time_Taken_minutes': ['Time_Taken_minutes', 'Time Taken minutes', 'Time Taken (minutes)'],
+    'Outcome_Score': ['Outcome_Score', 'Outcome Score'],
+    'Job_Name': ['Job_Name', 'Job Name'],
+    'Task_to_be_done': ['Task_to_be_done', 'Task to be done', 'Task Description', 'Task']
+}
 
 ENGINEERS_DATA = {
     'ENG001': {'name': 'John Doe', 'level': 'Senior'},
@@ -112,6 +122,18 @@ CAR_MODELS = {
 
 URGENCY_LEVELS = ['Normal', 'High', 'Low']
 
+def standardize_columns(df, mapping):
+    """Renames DataFrame columns based on a mapping of possible names."""
+    rename_dict = {}
+    df_columns = [col.strip() for col in df.columns] # Remove leading/trailing spaces
+    for standard_name, possible_names in mapping.items():
+        for possible_name in possible_names:
+            if possible_name in df_columns:
+                rename_dict[possible_name] = standard_name
+                break # Move to the next standard name once a match is found
+    df.rename(columns=rename_dict, inplace=True)
+    return df
+
 def get_tenure_from_level(level):
     """Calculates tenure in months based on experience level as per business rules."""
     if level == "Junior":
@@ -122,99 +144,91 @@ def get_tenure_from_level(level):
         return random.randint(15, 40)  # 15 to 40 years
     else:
         return random.randint(1, 60) # Fallback
+
 def calculate_overall_performance(engineer_df):
-    """
-    Calculates a credible Overall_Performance_Score using a weighted average.
-    """
     print("Calculating credible Overall_Performance_Score...")
+    score_columns = [col for col in engineer_df.columns if col.endswith('_Score') and 'Overall_Performance_Score' not in col]
     
-    # --- Step 1: Calculate and Normalize Components ---
-    score_columns = [col for col in engineer_df.columns if col.endswith('_Score') and col != 'Overall_Performance_Score']
     engineer_df['Quality_Score'] = engineer_df[score_columns].mean(axis=1)
     engineer_df['Normalized_Customer_Rating'] = ((engineer_df['Customer_Rating'] - 1) / 4) * 100
     
     global_avg_time = engineer_df['Avg_Job_Completion_Time'].mean()
     speed_factor = global_avg_time / engineer_df['Avg_Job_Completion_Time']
+    
     engineer_df['Timeliness_Score'] = np.clip(speed_factor * 75, 0, 100)
     
-    # --- Step 2: Define Weights ---
-    weights = {'quality': 0.60, 'customer': 0.25, 'timeliness': 0.15}
-
-    # --- Step 3: Calculate the Final Weighted Score ---
-    final_score = (
-        engineer_df['Quality_Score'] * weights['quality'] +
-        engineer_df['Normalized_Customer_Rating'] * weights['customer'] +
-        engineer_df['Timeliness_Score'] * weights['timeliness']
-    )
+    weights = {'quality': 0.75, 'customer': 0.05, 'timeliness': 0.20}
+    final_score = (engineer_df['Quality_Score'] * weights['quality'] + engineer_df['Normalized_Customer_Rating'] * weights['customer'] + engineer_df['Timeliness_Score'] * weights['timeliness'])
     
-    engineer_df['Overall_Performance_Score'] = final_score.round().astype(int)
+    engineer_df['Overall_Performance_Score'] = np.clip(final_score.round().astype(int), 0, 100)
     
-    # Drop the intermediate calculation columns for a cleaner final output
-    engineer_df.drop(columns=['Quality_Score', 'Normalized_Customer_Rating', 'Timeliness_Score'], inplace=True)
-
+    columns_to_drop = ['Quality_Score', 'Normalized_Customer_Rating', 'Timeliness_Score']
+    
+    engineer_df.drop(columns=columns_to_drop, inplace=True, errors='ignore')
     return engineer_df
 
 # --- MODIFIED FUNCTION TO GENERATE AND CALCULATE ENGINEER PROFILES ---
-def generate_and_save_engineer_profiles(df_history):
-    """Generates raw profiles, calculates the final performance score, and saves to Excel."""
-    print("Generating engineer profiles...")
+def generate_and_save_engineer_profiles():
+    """Generates engineer profiles using data from the generated history file."""
+    print("\n--- Generating Engineer Profiles Based on Job History ---")
     
-    engineer_avg_times = {}
-    if not df_history.empty:
-        engineer_avg_times = df_history.groupby('Assigned_Engineer_Id')['Time_Taken_minutes'].mean().to_dict()
-    
+    try:
+        df_history = pd.read_excel(FLAT_FILE_EXCEL_PATH)
+        print(f"Successfully loaded job history from: {FLAT_FILE_EXCEL_PATH}")
+    except FileNotFoundError:
+        print(f"Error: Job history file not found at {FLAT_FILE_EXCEL_PATH}. Cannot generate engineer profiles.")
+        return
+
+    df_history = standardize_columns(df_history, COLUMN_MAPPING)
+
     engineer_records = []
+    
     for eid, e_info in ENGINEERS_DATA.items():
-        level = e_info['level']
-        tenure = get_tenure_from_level(level)
-        base_score = random.randint(70, 100)
-        
-        specializations = list(CAR_MODELS.keys())
-        specializations.append('All Makes')
-        
-        certs = {
-            'Junior': ['Basic Automotive Certification'],
-            'Senior': ['ASE Certification', 'Brake Specialist','Hybrid/Electric Vehicle'],
-            'Master': ['Master Technician', 'Advanced Diagnostics','I-CAR Gold']
-        }
-        
-        record = {
-            'engineer_id': eid, 
-            'engineer_name': e_info['name'], 
-            'Availability': "Yes",
-            'Year_of_Experience': tenure,
-            'Avg_Job_Completion_Time': int(engineer_avg_times.get(eid, random.randint(60, 120))),
-            'Specialization': random.choice(specializations),
-            'Certifications': ', '.join(random.sample(certs[level], k=min(len(certs[level]), 2))),
-            'Customer_Rating': random.randint(1, 5), 
-            'Overall_Performance_Score': base_score,
-            'Overall_Basic_Service_Score': random.randint(base_score-10, base_score),
-            'Overall_Intermediate_Service_Score': random.randint(base_score-15, base_score),
-            'Overall_Full_Service_Score': random.randint(base_score-20, base_score),
-            'Oil_Change_Score': random.randint(75, 100), 'Oil_Filter_Replacement': random.randint(75, 100),
-            'Air_Filter_Check_Score': random.randint(75, 100), 'Fluid_Levels_Check_Score': random.randint(75, 100),
-            'Tyre_Pressure_Check_Score': random.randint(75, 100),
-            'Visual_Inspection_(brakes, tires, suspension)_Score': random.randint(base_score-10, base_score),
-            'Brake_Inspection(pads, discs, calipers)_Score': random.randint(base_score-10, base_score),
-            'Tyre_Condition_and_Alignment_Check_Score': random.randint(base_score-10, base_score),
-            'Battery_Check_Score': random.randint(85, 100), 
-            'Exhaust_System_Inspection_Score': random.randint(base_score-10, base_score),
-            'Steering_and_Suspension_Check_Score': random.randint(base_score-15, base_score),
-            'Lights_and_Wipers_Check_Score': random.randint(85, 100), 
-            'Transmission_Check_Score': random.randint(base_score-15, base_score),
-            'Spark_Plugs_Replacement_Score': random.randint(base_score-10, base_score),
-            'Fuel_System_Inspection_Score': random.randint(base_score-15, base_score),
-            'Timing_Belt_Inspection_Score': random.randint(base_score-20, base_score),
-            'Comprehensive_Diagnostic_Check_Score': random.randint(base_score-20, base_score),
-            'Underbody_Inspection_Score': random.randint(base_score-10, base_score),
-            'Cabin_Filter_Replacement_Score': random.randint(85, 100)
-        }
+        level = e_info['level']; tenure = get_tenure_from_level(level)
+        specializations = list(CAR_MODELS.keys()); specializations.append('All Makes')
+        certs = {'Junior': ['Basic Automotive Certification'],
+                 'Senior': ['ASE Certification', 'Brake Specialist','Hybrid/Electric Vehicle'],
+                 'Master': ['Master Technician', 'Advanced Diagnostics','I-CAR Gold']}
+        record = {'Engineer_ID': eid, 
+                  'Engineer_Name': e_info['name'], 
+                  'Availability': "Yes",
+                  'Years_of_Experience': tenure, 
+                  'Specialization': random.choice(specializations),
+                  'Certifications': ', '.join(random.sample(certs[level], k=min(len(certs[level]), 2)))}
         engineer_records.append(record)
-    
-    # Convert to DataFrame and then calculate the final score
     engineer_df = pd.DataFrame(engineer_records)
+
+    print("Calculating real metrics from history data...")
+    # The groupby operations now use the GUARANTEED standard column names
+    engineer_stats = df_history.groupby('Engineer_Id').agg(
+        Avg_Job_Completion_Time=('Time_Taken_minutes', 'mean'),
+        Customer_Rating=('Outcome_Score', 'mean')
+    ).reset_index()
+
+    job_scores = df_history.groupby(['Engineer_Id', 'Job_Name'])['Outcome_Score'].mean().unstack()
+    job_scores = ((job_scores - 1) / 4) * 100
+    job_scores.columns = [f"Overall_{col.replace(' ', '_')}_Score" for col in job_scores.columns]
+
+    task_scores = df_history.groupby(['Engineer_Id', 'Task_Description'])['Outcome_Score'].mean().unstack()
+    task_scores = ((task_scores - 1) / 4) * 100
+    task_scores.columns = [f"{col.replace(' ', '_').replace('(', '').replace(')', '').replace(',', '')}_Score" for col in task_scores.columns]
     
-    return engineer_df
+    print("Merging all calculated scores into engineer profiles...")
+    engineer_df = pd.merge(engineer_df, engineer_stats, left_on='Engineer_ID', right_on='Engineer_Id', how='left')
+    engineer_df.drop(columns=['Engineer_Id'], inplace=True, errors='ignore') # Clean up after merge
+    engineer_df = pd.merge(engineer_df, job_scores, left_on='Engineer_ID', right_index=True, how='left')
+    engineer_df = pd.merge(engineer_df, task_scores, left_on='Engineer_ID', right_index=True, how='left')
+    
+    score_cols_to_fill = [col for col in engineer_df.columns if '_Score' in col]
+    engineer_df[score_cols_to_fill] = engineer_df[score_cols_to_fill].fillna(75.0)
+    engineer_df['Avg_Job_Completion_Time'].fillna(engineer_df['Avg_Job_Completion_Time'].mean(), inplace=True)
+    engineer_df['Customer_Rating'].fillna(3.0, inplace=True)
+
+    engineer_df_final = calculate_overall_performance(engineer_df)
+    engineer_df_final.to_excel(ENGINEER_EXCEL_PATH, index=False)
+    print(f"Successfully created data-driven Engineer Profiles Excel file: {ENGINEER_EXCEL_PATH}")
+    return engineer_df_final
+
 # --- Main Generation Logic ---
 
 def generate_flat_data(num_jobs):
@@ -309,13 +323,30 @@ def generate_flat_data(num_jobs):
 
     return pd.DataFrame(all_records)
 
+def populate_database(df_history, engineer_df_final, db_path):
+    print("\n--- Populating Database ---")
+    try:
+        conn = sqlite3.connect(db_path)
+        # Populate job history
+        df_history.to_sql('job_history', conn, if_exists='replace', index=False)
+        print(f"Successfully inserted {len(df_history)} records into 'job_history' table.")
+        # Populate engineer profiles
+        engineer_df_final.to_sql('engineer_profiles', conn, if_exists='replace', index=False)
+        print(f"Successfully inserted {len(engineer_df_final)} records into 'engineer_profiles' table.")
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+    finally:
+        if conn: conn.close()
 
 if __name__ == '__main__':
     # Ensure the /data directory exists
     os.makedirs(DATA_DIR, exist_ok=True)
     
     try:
-        print(f"Generating {NUM_RECORDS} unique jobs, each with multiple random tasks...")
+        print(f"--- Loading Job History from Excel file: {FLAT_FILE_EXCEL_PATH} ---")
+        df_history = pd.read_excel(FLAT_FILE_EXCEL_PATH)
+        df_engineers_final = pd.read_excel(ENGINEER_EXCEL_PATH)
+        '''print(f"Generating {NUM_RECORDS} unique jobs, each with multiple random tasks...")
         flat_data_df = generate_flat_data(NUM_RECORDS)
 
         # Convert datetime columns to a readable string format for Excel
@@ -326,8 +357,16 @@ if __name__ == '__main__':
         flat_data_df.to_excel(FLAT_FILE_EXCEL_PATH, index=False)
         
         print(f"\nSuccessfully created the flat job history Excel file at: {FLAT_FILE_EXCEL_PATH}")
-        print(f"Generated a total of {len(flat_data_df)} task rows from {NUM_RECORDS} jobs.")
+        print(f"Generated a total of {len(flat_data_df)} task rows from {NUM_RECORDS} jobs.")'''
 
+        #df_engineers_final = generate_and_save_engineer_profiles()
+
+        # Populate both tables in the database
+        populate_database(df_history, df_engineers_final, DB_PATH)
+
+    except FileNotFoundError:
+        print(f"ERROR: The history file was not found at '{FLAT_FILE_EXCEL_PATH}'.")
+        print("Please make sure your data file is placed in the 'data' directory.")
     except Exception as e:
         print(f"An error occurred: {e}")
 
