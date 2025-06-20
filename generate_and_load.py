@@ -11,7 +11,7 @@ import numpy as np
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATA_DIR = os.path.join(BASE_DIR, 'data')
-FLAT_FILE_EXCEL_PATH = os.path.join(DATA_DIR, 'generated_flat_job_history.xlsx')
+FLAT_FILE_EXCEL_PATH = os.path.join(DATA_DIR, 'generated_flat_job_test.xlsx')
 MAPPING_Excel_PATH = os.path.join(DATA_DIR, 'Job_Task_Mapping.xlsx')
 DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 ENGINEER_EXCEL_PATH = os.path.join(DATA_DIR, 'engineer_profiles.xlsx')
@@ -346,7 +346,7 @@ if __name__ == '__main__':
         print(f"--- Loading Job History from Excel file: {FLAT_FILE_EXCEL_PATH} ---")
         df_history = pd.read_excel(FLAT_FILE_EXCEL_PATH)
         df_engineers_final = pd.read_excel(ENGINEER_EXCEL_PATH)
-        '''print(f"Generating {NUM_RECORDS} unique jobs, each with multiple random tasks...")
+        print(f"Generating {NUM_RECORDS} unique jobs, each with multiple random tasks...")
         flat_data_df = generate_flat_data(NUM_RECORDS)
 
         # Convert datetime columns to a readable string format for Excel
@@ -357,9 +357,9 @@ if __name__ == '__main__':
         flat_data_df.to_excel(FLAT_FILE_EXCEL_PATH, index=False)
         
         print(f"\nSuccessfully created the flat job history Excel file at: {FLAT_FILE_EXCEL_PATH}")
-        print(f"Generated a total of {len(flat_data_df)} task rows from {NUM_RECORDS} jobs.")'''
+        print(f"Generated a total of {len(flat_data_df)} task rows from {NUM_RECORDS} jobs.")
 
-        #df_engineers_final = generate_and_save_engineer_profiles()
+        df_engineers_final = generate_and_save_engineer_profiles()
 
         # Populate both tables in the database
         populate_database(df_history, df_engineers_final, DB_PATH)

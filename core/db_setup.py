@@ -48,6 +48,27 @@ def setup_database():
     );
     """
 
+    sql_create_job_card_table = """
+    CREATE TABLE IF NOT EXISTS job_card (
+        Job_Card_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Job_Name TEXT NOT NULL,
+        Task_ID TEXT NOT NULL,
+        Task_Description TEXT,
+        Urgency TEXT,
+        VIN TEXT NOT NULL,
+        Make TEXT,
+        Model TEXT,
+        Mileage INTEGER,
+        Estimated_Standard_Time INTEGER,
+        Status TEXT DEFAULT 'Pending',
+        Date_Created DATE,
+        Assigned_Engineer_Id TEXT,
+        Time_Started DATETIME,
+        Time_Ended DATETIME,
+        Outcome_Score INTEGER
+    );
+    """
+
     sql_create_job_definitions_table = """
     CREATE TABLE IF NOT EXISTS job_definitions (
         Parent_job_id TEXT PRIMARY KEY,
@@ -120,6 +141,7 @@ def setup_database():
         create_table(conn, sql_create_task_definitions_table)
         create_table(conn, sql_create_job_task_mapping_table)
         create_table(conn, sql_create_engineer_profiles_table)
+        create_table(conn, sql_create_job_card_table)
         conn.close()
         print("Database setup complete.")
     else:
