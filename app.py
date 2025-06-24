@@ -1,49 +1,48 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
 from job_manager import (
-    fetch_unassigned_jobs,
-    assign_engineers_to_pending_jobs,
-    complete_job,
-    fetch_available_engineers,
-    fetch_all_jobs
+    get_connection,
+    check_availability,
+    update_job_assignment,
+    mark_engineer_unavailable,
+    get_task_id_for_job,
 )
+from recommender import recommend_engineers_memory_cf
 
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return "🚀 Backend is running!"
-
-@app.route('/jobs', methods=['GET'])
-def get_all_jobs():
-    jobs = fetch_all_jobs()
-    return jobs.to_json(orient='records')
-
-@app.route('/jobs/unassigned', methods=['GET'])
-def get_unassigned_jobs():
-    jobs = fetch_unassigned_jobs()
-    return jobs.to_json(orient='records')
-
 @app.route('/jobs/assign', methods=['POST'])
-def assign_jobs():
-    assign_engineers_to_pending_jobs()
-    return jsonify({"message": "Engineers assigned to pending jobs."})
+def assign_engineer_to_job():
+    data = request.get_json()
+    job_card_id = data.get('job_card_id')
 
-@app.route('/engineers/available', methods=['GET'])
-def get_available_engineers():
-    engs = fetch_available_engineers()
-    return engs.to_json(orient='records')
+    if not job_card_id:
+        return jsonify({"error": "Missing job_card_id"}), 400
 
-@app.route('/jobs/complete', methods=['POST'])
-def complete():
-    data = request.json
-    job_id = data.get('job_card_id')
-    score = data.get('outcome_score')
+    task_id = get_task_id_for_job(job_card_id)
+    if not task_id:
+        return jsonify({"error": "Job_Card_ID not found"}), 404
 
-    if job_id is None or score is None:
-        return jsonify({"error": "Missing job_card_id or outcome_score"}), 400
+    recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
+    if isinstance(recommendations, str):
+        return jsonify({"error": recommendations}), 400
 
-    complete_job(job_id, score)
-    return jsonify({"message": f"Job {job_id} marked completed with score {score}."})
+    assigned_engineer = None
+    for eng_id, score in recommendations:
+        if check_availability(eng_id):
+            assigned_engineer = eng_id
+            break
 
-if __name__ == '__main__':
+    if not assigned_engineer:
+        return jsonify({"error": "No available engineer found"}), 409
+
+    update_job_assignment(job_card_id, assigned_engineer)
+    mark_engineer_unavailable(assigned_engineer)
+
+    return jsonify({
+        "message": f"Engineer {assigned_engineer} assigned to job {job_card_id}",
+        "recommendation_reason": reason
+    }), 200
+
+
+if __name__ == "__main__":
     app.run(debug=True)

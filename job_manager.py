@@ -33,7 +33,7 @@ def update_job_assignment(job_card_id, engineer_id):
 
 def fetch_available_engineers():
     with get_connection() as conn:
-        return pd.read_sql("SELECT * FROM engineer_profiles WHERE Availability = 'Available'", conn)
+        return pd.read_sql("SELECT * FROM engineer_profiles WHERE Availability = 'Yes'", conn)
 
 
 def check_availability(engineer_id):
@@ -41,22 +41,31 @@ def check_availability(engineer_id):
         cursor = conn.execute(
             "SELECT Availability FROM engineer_profiles WHERE Engineer_ID = ?", (engineer_id,))
         row = cursor.fetchone()
-        return row and row[0] == 'Available'
+        return row and row[0] == 'Yes'
 
 
 def mark_engineer_unavailable(engineer_id):
     with get_connection() as conn:
         conn.execute(
-            "UPDATE engineer_profiles SET Availability = 'Unavailable' WHERE Engineer_ID = ?", (engineer_id,))
+            "UPDATE engineer_profiles SET Availability = 'No' WHERE Engineer_ID = ?", (engineer_id,))
         print(f"Engineer {engineer_id} marked as unavailable")
 
 
 def mark_engineer_available(engineer_id):
     with get_connection() as conn:
         conn.execute(
-            "UPDATE engineer_profiles SET Availability = 'Available' WHERE Engineer_ID = ?", (engineer_id,))
+            "UPDATE engineer_profiles SET Availability = 'Yes' WHERE Engineer_ID = ?", (engineer_id,))
         print(f"Engineer {engineer_id} marked as available")
 
+
+def get_task_id_for_job(job_card_id):
+    with get_connection() as conn:
+        cursor = conn.execute("SELECT Task_ID FROM job_card WHERE Job_Card_ID = ?", (job_card_id,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        else:
+            return None
 
 
 
