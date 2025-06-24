@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-job_data_path = "your_path_here/generated_flat_job_history 2 (1).xlsx"  
+job_data_path = "data/generated_flat_job_history_FINAL.xlsx"
 df_jobs = pd.read_excel(job_data_path)
 
 
