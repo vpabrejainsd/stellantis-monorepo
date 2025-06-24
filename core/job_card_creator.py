@@ -1,7 +1,6 @@
 import sqlite3
 import os
 from datetime import datetime
-import random # We'll still use this for the "Custom Service" case
 
 # --- Configuration & Data Dictionaries ---
 # In a real application, this data might be loaded from a central config file or database
@@ -41,76 +40,25 @@ JOB_TO_TASKS_MAPPING = {
     'Custom Service': []
 }
 
-def create_new_job_card():
+def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selected_tasks=None):
     """
-    Simulates a manager creating a new job card by providing input.
-    This function creates records in the 'job_card' table.
+    Accepts data from a UI/frontend and creates job card records in the database.
+    Returns True on success, False on failure.
     """
-    print("\n--- Creating a New Job Card ---")
-    
-    # --- 1. Gather Input from the Manager ---
-    print("Available Job Types:", list(JOB_TO_TASKS_MAPPING.keys()))
-    job_name = input("Enter the Job Name: ")
-    if job_name not in JOB_TO_TASKS_MAPPING:
-        print("Error: Invalid Job Name.")
-        return
-
-    print("\nEnter Vehicle Details:")
-    vin = input("  VIN: ")
-    make = input("  Make: ")
-    model = input("  Model: ")
-    try:
-        mileage = int(input("  Mileage: "))
-    except ValueError:
-        print("Error: Mileage must be a number.")
-        return
-        
-    urgency = input("Enter Urgency (Normal, High, Low): ")
-    if urgency not in ['Normal', 'High', 'Low']:
-        print("Error: Invalid Urgency level.")
-        return
-    tasks_to_perform = []
-    
-    # --- 2. Determine the list of tasks to be created ---
-    if job_name == 'Custom Service':
-        print("\n--- Available Tasks for Custom Service ---")
-        
-        # Create an ordered list of task IDs to map user input to
-        available_task_ids = list(TASKS_DATA.keys())
-        
-        for i, task_id in enumerate(available_task_ids):
-            print(f"  [{i+1}] {TASKS_DATA[task_id]['name']}")
-        
-        try:
-            selection_str = input("\nEnter the numbers of the tasks you want to add, separated by commas (e.g., 1, 5, 9): ")
-            # Convert string input like "1, 5, 9" to a list of indices [0, 4, 8]
-            selected_indices = [int(s.strip()) - 1 for s in selection_str.split(',')]
-            
-            # Validate selections and build the final task list
-            for index in selected_indices:
-                if 0 <= index < len(available_task_ids):
-                    tasks_to_perform.append(available_task_ids[index])
-                else:
-                    print(f"Warning: Task number {index + 1} is invalid and will be skipped.")
-            
-        except ValueError:
-            print("Error: Invalid input. Please enter only numbers separated by commas.")
-            return
+    if job_name == 'Custom Service' and selected_tasks:
+        tasks_to_perform = selected_tasks
     else:
-        # This is the existing logic for predefined jobs like "Basic Service"
         tasks_to_perform = JOB_TO_TASKS_MAPPING.get(job_name, [])
 
     if not tasks_to_perform:
-        print("No valid tasks were selected. Aborting job card creation.")
-        return
-    
-    # --- 3. Create a record for each task in the database ---
+        print(f"Error: No tasks found for job '{job_name}'.")
+        return False, f"No tasks found for job '{job_name}'"
+        
     records_to_insert = []
     for task_id in tasks_to_perform:
         task_info = TASKS_DATA.get(task_id)
         if not task_info:
-            print(f"Warning: Task ID {task_id} not found in TASKS_DATA. Skipping.")
-            continue
+            continue # Skip if task_id is invalid
             
         record = (
             job_name, task_id, task_info['name'], urgency, vin, make, model,
@@ -118,30 +66,46 @@ def create_new_job_card():
         )
         records_to_insert.append(record)
         
-    # --- 4. Connect to DB and insert records ---
     conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        
         sql = """
         INSERT INTO job_card (
             Job_Name, Task_ID, Task_Description, Urgency, VIN, Make, Model,
             Mileage, Estimated_Standard_Time, Status, Date_Created
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        
         cursor.executemany(sql, records_to_insert)
         conn.commit()
         
-        print(f"\nSuccessfully created {len(records_to_insert)} task(s) for Job '{job_name}' (VIN: {vin}).")
-        
+        print(f"Successfully inserted {len(records_to_insert)} tasks for Job '{job_name}' into job_card.")
+        return True
     except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        print(f"Database error in create_job_from_ui_input: {e}")
+        return False, f"Database error: {e}"
     finally:
         if conn:
             conn.close()
 
 if __name__ == '__main__':
-    # This allows you to test this script directly
-    create_new_job_card()
+    # This simulates the data coming from the UI form
+    print("--- Simulating UI Input for a 'Basic Service' Job ---")
+    
+    # The UI collects this data from the manager
+    ui_job_name = "Basic Service"
+    ui_vin = "UI-TEST-VIN-123"
+    ui_make = "Honda"
+    ui_model = "Civic"
+    ui_mileage = 150000
+    ui_urgency = "High"
+    
+    # The UI code calls your function
+    success = create_job_from_ui_input(
+        job_name=ui_job_name,
+        vin=ui_vin,
+        make=ui_make,
+        model=ui_model,
+        mileage=ui_mileage,
+        urgency=ui_urgency
+    )

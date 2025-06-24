@@ -1,82 +1,110 @@
+# In core/engineer_analyzer.py
+import pandas as pd
 import sqlite3
 import os
-import pandas as pd
+import numpy as np
 
-# Database path
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # garage_ai_assigner directory
-DATABASE_NAME = os.path.join(BASE_DIR, 'database', 'workshop.db')
+# --- Configuration ---
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 
-def get_db_connection():
-    """Establishes a connection to the SQLite database."""
-    conn = sqlite3.connect(DATABASE_NAME)
-    conn.row_factory = sqlite3.Row # Allows accessing columns by name
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+def calculate_overall_performance(engineer_df):
+    """Calculates a credible Overall_Performance_Score using a weighted average."""
+    print("Calculating credible Overall_Performance_Score...")
+    score_columns = [col for col in engineer_df.columns if col.endswith('_Score') and 'Overall_Performance_Score' not in col]
+    
+    engineer_df['Quality_Score'] = engineer_df[score_columns].mean(axis=1)
+    engineer_df['Normalized_Customer_Rating'] = ((engineer_df['Customer_Rating'] - 1) / 4) * 100
+    
+    global_avg_time = engineer_df['Avg_Job_Completion_Time'].mean()
+    speed_factor = global_avg_time / engineer_df['Avg_Job_Completion_Time']
+    
+    engineer_df['Timeliness_Score'] = np.clip(speed_factor * 75, 0, 100)
+    
+    weights = {'quality': 0.75, 'customer': 0.05, 'timeliness': 0.20}
+    final_score = (engineer_df['Quality_Score'] * weights['quality'] + engineer_df['Normalized_Customer_Rating'] * weights['customer'] + engineer_df['Timeliness_Score'] * weights['timeliness'])
+    
+    engineer_df['Overall_Performance_Score'] = np.clip(final_score.round().astype(int), 0, 100)
+    
+    columns_to_drop = ['Quality_Score', 'Normalized_Customer_Rating', 'Timeliness_Score']
+    
+    engineer_df.drop(columns=columns_to_drop, inplace=True, errors='ignore')
+    return engineer_df
 
-def calculate_and_update_engineer_scores():
+def analyze_and_update_profiles():
     """
-    Calculates the average past job score for each engineer and updates
-    the 'overall_past_job_score' in the 'engineers' table.
+    Reads from the job_history table, calculates performance metrics,
+    and updates the engineer_profiles table in the database.
     """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    print("Calculating and updating engineer overall past job scores...")
-
+    print("--- Starting Engineer Performance Analysis ---")
+    conn = sqlite3.connect(DB_PATH)
+    
     try:
-        # Fetch all past performance data
-        cursor.execute("SELECT engineer_id, outcome_score FROM engineer_past_performance")
-        past_performances = cursor.fetchall()
+        # 1. Read all necessary data from the database
+        print("Reading data from database...")
+        df_history = pd.read_sql_query("SELECT * FROM job_history WHERE Status = 'Completed'", conn)
+        df_profiles = pd.read_sql_query("SELECT * FROM engineer_profiles", conn)
 
-        if not past_performances:
-            print("No past performance data found to calculate scores.")
+        if df_history.empty:
+            print("Job history is empty. No new data to analyze.")
             return
 
-        # Use Pandas for easy grouping and averaging
-        df_performance = pd.DataFrame(past_performances, columns=['engineer_id', 'outcome_score'])
-        
-        # Ensure outcome_score is numeric
-        df_performance['outcome_score'] = pd.to_numeric(df_performance['outcome_score'], errors='coerce')
-        
-        # Calculate average score per engineer
-        # The .groupby().mean() will calculate the average of 'outcome_score' for each 'engineer_id'
-        engineer_scores = df_performance.groupby('engineer_id')['outcome_score'].mean().reset_index()
-        engineer_scores.rename(columns={'outcome_score': 'avg_score'}, inplace=True)
+        # 2. Calculate REAL metrics from the job history data
+        print("Calculating performance metrics from history...")
+        # General stats
+        engineer_stats = df_history.groupby('Assigned_Engineer_Id').agg(
+            Avg_Job_Completion_Time=('Time_Taken_minutes', 'mean'),
+            Customer_Rating=('Outcome_Score', 'mean')
+        ).reset_index()
 
-        # Update the engineers table
-        updated_count = 0
-        for _, row in engineer_scores.iterrows():
-            engineer_id = row['engineer_id']
-            avg_score = row['avg_score']
+        # Job-level scores
+        job_scores = df_history.groupby(['Assigned_Engineer_Id', 'Job_Name'])['Outcome_Score'].mean().unstack()
+        job_scores = ((job_scores - 1) / 4) * 100
+        job_scores.columns = [f"Overall_{col.replace(' ', '_')}_Score" for col in job_scores.columns]
+        
+        # Task-level scores
+        task_scores = df_history.groupby(['Assigned_Engineer_Id', 'Task_to_be_done'])['Outcome_Score'].mean().unstack()
+        task_scores = ((task_scores - 1) / 4) * 100
+        task_scores.columns = [f"{col.replace(' ', '_').replace('(', '').replace(')', '').replace(',', '')}_Score" for col in task_scores.columns]
+
+        # 3. Merge calculated scores into the base profiles
+        print("Merging calculated scores...")
+        # Start with the original profiles
+        updated_df = pd.merge(df_profiles[['Engineer_ID', 'Engineer_Name']], engineer_stats, left_on='Engineer_ID', right_on='Assigned_Engineer_Id', how='left')
+        updated_df = pd.merge(updated_df, job_scores, left_on='Engineer_ID', right_on='Assigned_Engineer_Id', how='left')
+        updated_df = pd.merge(updated_df, task_scores, left_on='Engineer_ID', right_on='Assigned_Engineer_Id', how='left')
+        
+        # Clean up and fill missing values
+        updated_df.drop(columns=[col for col in updated_df.columns if 'Assigned_Engineer_Id' in str(col)], inplace=True)
+        score_cols_to_fill = [col for col in updated_df.columns if '_Score' in col]
+        updated_df[score_cols_to_fill] = updated_df[score_cols_to_fill].fillna(75.0)
+        updated_df['Avg_Job_Completion_Time'].fillna(updated_df['Avg_Job_Completion_Time'].mean(), inplace=True)
+        updated_df['Customer_Rating'].fillna(3.0, inplace=True)
+        
+        # 4. Calculate the final weighted performance score
+        final_profiles_df = calculate_overall_performance(updated_df)
+        
+        # 5. Update the database table
+        print("Updating engineer_profiles table in the database...")
+        cursor = conn.cursor()
+        for _, row in final_profiles_df.iterrows():
+            # Prepare the SET part of the SQL query dynamically
+            set_clause = ", ".join([f'"{col}" = ?' for col in final_profiles_df.columns if col != 'Engineer_ID'])
+            values = [row[col] for col in final_profiles_df.columns if col != 'Engineer_ID']
+            values.append(row['Engineer_ID']) # for the WHERE clause
             
-            # Ensure engineer exists in the engineers table (should have been populated by data_loader)
-            cursor.execute("SELECT 1 FROM engineers WHERE engineer_id = ?", (engineer_id,))
-            if cursor.fetchone():
-                cursor.execute("""
-                    UPDATE engineers
-                    SET overall_past_job_score = ?
-                    WHERE engineer_id = ?
-                """, (avg_score, engineer_id))
-                updated_count += 1
-            else:
-                print(f"Warning: Engineer ID {engineer_id} found in performance data but not in engineers table. Skipping score update for this engineer.")
-        
-        conn.commit()
-        print(f"Successfully updated overall_past_job_score for {updated_count} engineers.")
+            sql_update = f"UPDATE engineer_profiles SET {set_clause} WHERE Engineer_ID = ?"
+            cursor.execute(sql_update, values)
 
-    except sqlite3.Error as e:
-        print(f"Database error during score calculation/update: {e}")
+        conn.commit()
+        print(f"Successfully updated {len(final_profiles_df)} records in the engineer_profiles table.")
+
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred during analysis: {e}")
     finally:
         if conn:
             conn.close()
 
 if __name__ == '__main__':
-    if not os.path.exists(DATABASE_NAME):
-        print(f"Database file {DATABASE_NAME} not found. Please run db_setup.py and data_loader.py first.")
-    else:
-        # Make sure engineers and their past performance data are loaded first
-        print("Ensuring engineers and past performance data are loaded before calculating scores...")
-        print("(This script assumes data_loader.py has been run successfully.)")
-        calculate_and_update_engineer_scores()
+    analyze_and_update_profiles()
+    print("\nAnalysis process complete.")
