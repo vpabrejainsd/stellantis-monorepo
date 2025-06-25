@@ -102,10 +102,16 @@ def assign_engineers_to_pending_jobs():
 
 def complete_job(job_card_id, outcome_score):
     with get_connection() as conn:
-        conn.execute("UPDATE job_card SET Status = 'Completed' WHERE Job_Card_ID = ?", (job_card_id,))
-        conn.execute("INSERT INTO job_outcomes (Job_Card_ID, Outcome_Score) VALUES (?, ?)", (job_card_id, outcome_score))
+        conn.execute("""
+            UPDATE job_card 
+            SET Status = 'Completed', Outcome_Score = ? 
+            WHERE Job_Card_ID = ?
+        """, (outcome_score, job_card_id))
 
-        eng_id = conn.execute("SELECT Assigned_Engineer_ID FROM job_card WHERE Job_Card_ID = ?", (job_card_id,)).fetchone()
+        eng_id = conn.execute("""
+            SELECT Assigned_Engineer_ID FROM job_card WHERE Job_Card_ID = ?
+        """, (job_card_id,)).fetchone()
+
         if eng_id and eng_id[0]:
             mark_engineer_available(eng_id[0])
         print(f"Job {job_card_id} marked completed with score {outcome_score}")

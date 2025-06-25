@@ -71,7 +71,7 @@ def assign_engineer_to_job():
 
 @app.route('/jobs/complete', methods=['POST'])
 def complete_job_endpoint():
-    data = request.get_json()
+    data = request.get_json() 
     job_card_id = data.get('job_card_id')
     outcome_score = data.get('outcome_score')
 
