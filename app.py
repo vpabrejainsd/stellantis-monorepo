@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from recommender import recommend_engineers_memory_cf
 
 from job_manager import (
     fetch_all_jobs,
@@ -13,7 +14,6 @@ from job_manager import (
     complete_job,
 )
 
-from recommender import recommend_engineers_memory_cf
 
 app = Flask(__name__)
 CORS(app)
