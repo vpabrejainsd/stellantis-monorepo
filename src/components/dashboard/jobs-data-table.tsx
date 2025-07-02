@@ -22,7 +22,7 @@ import {
   parseISO,
   startOfDay,
 } from "date-fns";
-import { ChevronDown, MoreHorizontal } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Star } from "lucide-react";
 import * as React from "react";
 import { type DateRange } from "react-day-picker";
 
@@ -59,6 +59,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../ui/dialog";
 
 // --- HELPER FUNCTIONS FOR CONDITIONAL STYLING ---
 const getJobRowColor = (status: Job["derivedCompletionStatus"]): string => {
@@ -73,10 +84,7 @@ const getTaskRowColor = (
   estimated: number,
 ): string => {
   if (status === "Completed") return "bg-green-100/50 dark:bg-green-900/20";
-  if (status !== "In Progress") return "bg-transparent";
-  if (timeTaken > estimated) return "bg-red-100/50 dark:bg-red-900/20";
-  if (estimated > 0 && timeTaken / estimated > 0.8)
-    return "bg-yellow-100/50 dark:bg-yellow-900/20";
+  if (status === "In Progress") return "bg-yellow-100/50 dark:bg-yellow-900/20";
   return "bg-transparent";
 };
 
@@ -215,11 +223,181 @@ function DataTableToolbar({ table }: DataTableToolbarProps) {
     </div>
   );
 }
+interface StarRatingProps {
+  rating: number;
+  onRatingChange: (rating: number) => void;
+  totalStars?: number;
+}
+function StarRating({
+  rating,
+  onRatingChange,
+  totalStars = 5,
+}: StarRatingProps) {
+  const [hoverRating, setHoverRating] = React.useState<number | null>(null);
 
-// --- EXPANDED ROW SUB-COMPONENT ---
-function TaskDetailsSubComponent({ tasks }: { tasks: UnifiedTask[] }) {
   return (
-    <>
+    <div className="flex items-center space-x-1">
+      {/* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */}
+      {[...Array(totalStars)].map((_, index) => {
+        const starValue = index + 1;
+        const isFilled = starValue <= (hoverRating ?? rating);
+        return (
+          <button
+            key={starValue}
+            type="button"
+            onMouseEnter={() => setHoverRating(starValue)}
+            onMouseLeave={() => setHoverRating(null)}
+            onClick={() => onRatingChange(starValue)}
+            className="cursor-pointer"
+          >
+            <Star
+              className={cn(
+                "h-8 w-8 transition-colors",
+                isFilled ? "fill-yellow-400 text-yellow-400" : "text-gray-300",
+              )}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+// --- NEW: Mark Complete Dialog Component ---
+interface MarkCompleteDialogProps {
+  task: UnifiedTask;
+  onTaskComplete: () => void; // Callback to refresh data
+}
+function MarkCompleteDialog({ task, onTaskComplete }: MarkCompleteDialogProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [outcomeScore, setOutcomeScore] = React.useState(0);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const handleSubmit = async () => {
+    if (outcomeScore === 0) {
+      toast.error("Please provide a rating from 1 to 5.");
+      return;
+    }
+    setIsSubmitting(true);
+
+    const promise = fetch(
+      `${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs/mark-complete`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_id: task.Task_Id,
+          job_id: task.Job_Id,
+          outcome_score: outcomeScore,
+        }),
+      },
+    );
+
+    toast.promise(promise, {
+      loading: "Marking task as complete...",
+      success: async (res) => {
+        if (!res.ok) {
+          const error = (await res.json()) as { error: string };
+          throw new Error(error.error || "Failed to mark as complete.");
+        }
+        onTaskComplete(); // Refresh the table data
+        setIsOpen(false);
+        return `Task "${task.Task_Description}" marked as complete!`;
+      },
+      error: (err: Error) => err.message,
+      finally: () => setIsSubmitting(false),
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          Mark Complete
+        </DropdownMenuItem>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Complete Task: {task.Task_Description}</DialogTitle>
+          <DialogDescription>
+            Provide an outcome score for this task. This action cannot be
+            undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col items-center gap-4 py-4">
+          <p className="text-muted-foreground text-sm">
+            Rate the outcome of this task (1-5)
+          </p>
+          <StarRating rating={outcomeScore} onRatingChange={setOutcomeScore} />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Submitting..." : "Mark as Complete"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+// --- NEW: Start Task Dialog/Button Component ---
+// This component will handle starting a task.
+interface StartTaskActionProps {
+  task: UnifiedTask;
+  onTaskStart: () => void; // Callback to refresh data
+}
+function StartTaskAction({ task, onTaskStart }: StartTaskActionProps) {
+  const handleStartTask = () => {
+    const promise = fetch(
+      `${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs/start-task`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_id: task.Job_Id,
+          task_id: task.Task_Id,
+        }),
+      },
+    );
+
+    toast.promise(promise, {
+      loading: "Starting task...",
+      success: async (res) => {
+        if (!res.ok) {
+          const error = (await res.json()) as { error: string };
+          throw new Error(error.error || "Failed to start task.");
+        }
+        onTaskStart(); // Refresh the table data
+        return `Task "${task.Task_Description}" has been started!`;
+      },
+      error: (err: Error) => err.message,
+    });
+  };
+
+  return (
+    <DropdownMenuItem
+      onSelect={(e) => {
+        e.preventDefault();
+        handleStartTask();
+      }}
+    >
+      Start Task
+    </DropdownMenuItem>
+  );
+}
+
+// --- EXPANDED ROW SUB-COMPONENT (UPDATED) ---
+// This is the component that renders the list of tasks for an expanded job row.
+function TaskDetailsSubComponent({
+  tasks,
+  onTaskUpdate,
+}: {
+  tasks: UnifiedTask[];
+  onTaskUpdate: () => void;
+}) {
+  return (
+    <div className="bg-muted/50 p-4">
       <h4 className="mb-2 font-semibold">Tasks for this Job:</h4>
       <Table>
         <TableHeader>
@@ -229,6 +407,7 @@ function TaskDetailsSubComponent({ tasks }: { tasks: UnifiedTask[] }) {
             <TableHead>Assigned Engineer</TableHead>
             <TableHead>Est. Time</TableHead>
             <TableHead>Time Taken</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -238,6 +417,10 @@ function TaskDetailsSubComponent({ tasks }: { tasks: UnifiedTask[] }) {
               task.timeTaken,
               task.Estimated_Standard_Time,
             );
+            // Determine which actions are available based on the task status
+            const canStart = task.Status === "Assigned";
+            const canComplete = task.Status === "In Progress";
+
             return (
               <TableRow key={task.Task_Id} className={rowColor}>
                 <TableCell className="font-medium">
@@ -252,17 +435,51 @@ function TaskDetailsSubComponent({ tasks }: { tasks: UnifiedTask[] }) {
                     {task.Status}
                   </Badge>
                 </TableCell>
-                <TableCell>{task.Engineer_Name ?? "N/A"}</TableCell>
+                <TableCell>
+                  <div>{task.Engineer_Name ?? "N/A"}</div>
+                  {task.Engineer_Level && (
+                    <div className="text-muted-foreground text-xs">
+                      {task.Engineer_Level}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell>{task.Estimated_Standard_Time} mins</TableCell>
                 <TableCell>
                   {task.timeTaken > 0 ? `${task.timeTaken} mins` : "-"}
+                </TableCell>
+                <TableCell className="text-right">
+                  {task.Status !== "Completed" && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled>Edit</DropdownMenuItem>
+                        {/* Conditionally render the correct action */}
+                        {canStart && (
+                          <StartTaskAction
+                            task={task}
+                            onTaskStart={onTaskUpdate}
+                          />
+                        )}
+                        {canComplete && (
+                          <MarkCompleteDialog
+                            task={task}
+                            onTaskComplete={onTaskUpdate}
+                          />
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </TableCell>
               </TableRow>
             );
           })}
         </TableBody>
       </Table>
-    </>
+    </div>
   );
 }
 
@@ -368,96 +585,98 @@ export function JobsDataTable() {
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");
 
-  React.useEffect(() => {
-    const fetchAndProcessData = async () => {
-      setIsLoading(true);
-      try {
-        const [jobsResponse, historyResponse] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs`),
-          fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/job-history`),
-        ]);
+  const fetchAndProcessData = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [jobsResponse, historyResponse] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs`),
+        fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/job-history`),
+      ]);
 
-        const currentTasks = (await jobsResponse.json()) as CurrentTask[];
-        const historyTasks = (await historyResponse.json()) as HistoryTask[];
+      const currentTasks = (await jobsResponse.json()) as CurrentTask[];
+      const historyTasks = (await historyResponse.json()) as HistoryTask[];
 
-        const normalizedCurrentTasks: UnifiedTask[] = currentTasks.map(
-          (task) => ({
-            ...task, // Spread operator now correctly includes Engineer_Name and Engineer_Level
-            timeTaken: task.Time_Started
-              ? differenceInMinutes(new Date(), parseISO(task.Time_Started))
-              : 0,
-          }),
-        );
-        const normalizedHistoryTasks: UnifiedTask[] = historyTasks.map(
-          (task) => ({
-            Job_Id: task.job_id,
-            Task_Id: task.task_id,
-            Task_Description: task.task_description,
-            Status: "Completed",
-            Engineer_Id: task.assigned_engineer_id,
-            Engineer_Name: task.engineer_name, // Map history name
-            Engineer_Level: task.engineer_level, // Map history level
-            Estimated_Standard_Time: task.estimated_standard_time,
-            timeTaken: task.time_taken,
+      const normalizedCurrentTasks: UnifiedTask[] = currentTasks.map(
+        (task) => ({
+          ...task,
+          timeTaken: task.Time_Started
+            ? differenceInMinutes(new Date(), parseISO(task.Time_Started))
+            : 0,
+        }),
+      );
+      const normalizedHistoryTasks: UnifiedTask[] = historyTasks.map(
+        (task) => ({
+          Job_Id: task.job_id,
+          Task_Id: task.task_id,
+          Task_Description: task.task_description,
+          Status: "Completed",
+          Engineer_Id: task.assigned_engineer_id,
+          Engineer_Name: task.engineer_name,
+          Engineer_Level: task.engineer_level,
+          Estimated_Standard_Time: task.estimated_standard_time,
+          timeTaken: task.time_taken,
+          VIN: task.VIN,
+          Make: task.make,
+          Model: task.model,
+          Job_Name: task.job_name,
+          Date_Created: task.time_started,
+          Urgency: task.urgency,
+        }),
+      );
+      const allTasks = [...normalizedCurrentTasks, ...normalizedHistoryTasks];
+
+      const groupedJobs = allTasks.reduce(
+        (acc, task) => {
+          acc[task.Job_Id] ??= {
+            Job_Id: task.Job_Id,
             VIN: task.VIN,
-            Make: task.make,
-            Model: task.model,
-            Job_Name: task.job_name,
-            Date_Created: task.time_started,
-            Urgency: task.urgency,
-          }),
-        );
-        const allTasks = [...normalizedCurrentTasks, ...normalizedHistoryTasks];
-
-        const groupedJobs = allTasks.reduce(
-          (acc, task) => {
-            acc[task.Job_Id] ??= {
-              Job_Id: task.Job_Id,
-              VIN: task.VIN,
-              Make: task.Make,
-              Model: task.Model,
-              Job_Name: task.Job_Name,
-              Date_Created: task.Date_Created,
-              Urgency: task.Urgency,
-              tasks: [],
-              completedTasks: 0,
-              totalTasks: 0,
-              derivedCompletionStatus: "Not Started",
-            };
-            const currentJob = acc[task.Job_Id];
-            if (currentJob) {
-              currentJob.tasks.push(task);
-              currentJob.totalTasks++;
-              if (task.Status === "Completed") currentJob.completedTasks++;
-              if (currentJob.completedTasks === currentJob.totalTasks)
-                currentJob.derivedCompletionStatus = "Completed";
-              else if (
-                currentJob.completedTasks > 0 ||
-                currentJob.tasks.some(
-                  (t) => t.Status === "In Progress" || t.Status === "Assigned",
-                )
+            Make: task.Make,
+            Model: task.Model,
+            Job_Name: task.Job_Name,
+            Date_Created: task.Date_Created,
+            Urgency: task.Urgency,
+            tasks: [],
+            completedTasks: 0,
+            totalTasks: 0,
+            derivedCompletionStatus: "Not Started",
+          };
+          const currentJob = acc[task.Job_Id];
+          if (currentJob) {
+            currentJob.tasks.push(task);
+            currentJob.totalTasks++;
+            if (task.Status === "Completed") currentJob.completedTasks++;
+            if (currentJob.completedTasks === currentJob.totalTasks)
+              currentJob.derivedCompletionStatus = "Completed";
+            else if (
+              currentJob.completedTasks > 0 ||
+              currentJob.tasks.some(
+                (t) => t.Status === "In Progress" || t.Status === "Assigned",
               )
-                currentJob.derivedCompletionStatus = "In Progress";
-            }
-            return acc;
-          },
-          {} as Record<string, Job>,
-        );
-        console.log("Grouped Jobs:", groupedJobs);
+            )
+              currentJob.derivedCompletionStatus = "In Progress";
+          }
+          return acc;
+        },
+        {} as Record<string, Job>,
+      );
 
-        setData(Object.values(groupedJobs));
-      } catch (error) {
-        console.error("Failed to fetch and process job data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    void fetchAndProcessData();
+      setData(Object.values(groupedJobs));
+    } catch (error) {
+      console.error("Failed to fetch and process job data:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  React.useEffect(() => {
+    void fetchAndProcessData();
+  }, [fetchAndProcessData]);
 
   const table = useReactTable({
     data,
     columns,
+    filterFns: { dateRangeFilter },
+    state: { sorting, columnFilters, expanded, globalFilter },
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: (row, filterValue) => {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
@@ -471,8 +690,6 @@ export function JobsDataTable() {
         model.includes(searchTerm)
       );
     },
-    filterFns: { dateRangeFilter },
-    state: { sorting, columnFilters, expanded, globalFilter },
     getRowCanExpand: () => true,
     onExpandedChange: setExpanded,
     getExpandedRowModel: getExpandedRowModel(),
@@ -544,6 +761,7 @@ export function JobsDataTable() {
                           <div className="p-4">
                             <TaskDetailsSubComponent
                               tasks={row.original.tasks}
+                              onTaskUpdate={fetchAndProcessData}
                             />
                           </div>
                         </div>

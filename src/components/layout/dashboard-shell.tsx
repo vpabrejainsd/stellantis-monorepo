@@ -4,8 +4,6 @@
 import type { User } from "@prisma/client";
 import AppSidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-
-// Import the SidebarProvider from the shadcn/ui component
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 interface DashboardShellProps {
@@ -18,18 +16,21 @@ export default function DashboardShell({
   children,
 }: DashboardShellProps) {
   return (
-    // Wrap the entire shell in the SidebarProvider.
-    // This makes the sidebar's context available to all children,
-    // including AppSidebar and its internal components.
     <SidebarProvider>
-      <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-        <div className="bg-muted/40 hidden border-r md:block">
-          <AppSidebar userRole={user.role} />
-        </div>
+      {/* The root is now a flex container to place sidebar and main content side-by-side */}
+      <div className="flex h-screen w-full overflow-hidden">
+        {/* The sidebar is now a direct child of the flex container */}
+        <AppSidebar userRole={user.role} />
 
-        <div className="flex flex-col">
+        {/* This div wraps the header and main content, taking up the remaining space */}
+        <div className="flex flex-1 flex-col">
+          {/* Header is made sticky to stay at the top */}
           <Header userRole={user.role} />
-          <main className="bg-muted/40 flex-1 p-4 md:p-8">{children}</main>
+
+          {/* Main content area is scrollable independently */}
+          <main className="bg-muted/40 flex-1 overflow-y-auto p-4 md:p-8">
+            {children}
+          </main>
         </div>
       </div>
     </SidebarProvider>

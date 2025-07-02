@@ -1,5 +1,61 @@
 // src/lib/types.ts
 
+// EngineerProfile matches your database schema
+export interface EngineerProfile {
+  Engineer_ID: string;
+  Engineer_Name: string;
+  Availability: "Yes" | "No";
+  Years_of_Experience: number;
+  Specialization: string | null;
+  Certifications: string | null;
+  Avg_Job_Completion_Time: number;
+  Customer_Rating: number;
+  Overall_Basic_Service_Score: number;
+  Overall_Custom_Service_Score: number;
+  Overall_Full_Service_Score: number;
+  Overall_Intermediate_Service_Score: number;
+  Air_Filter_Check_Score: number;
+  Battery_Check_Score: number;
+  Brake_Inspection_Score: number;
+  Cabin_Filter_Replacement_Score: number;
+  Comprehensive_Diagnostic_Check_Score: number;
+  Exhaust_System_Inspection_Score: number;
+  Fluid_Levels_Check_Score: number;
+  Fuel_System_Inspection_Score: number;
+  Lights_and_Wipers_Check_Score: number;
+  Oil_Change_Score: number;
+  Oil_Filter_Replacement_Score: number;
+  Spark_Plugs_Replacement_Score: number;
+  Steering_and_Suspension_Check_Score: number;
+  Timing_Belt_Inspection_Score: number;
+  Transmission_Check_Score: number;
+  Tyre_Condition_and_Alignment_Check_Score: number;
+  Tyre_Pressure_Check_Score: number;
+  Underbody_Inspection_Score: number;
+  Visual_Inspection_Score: number;
+  Wheel_Alignment_and_Balancing_Score: number;
+  Overall_Performance_Score: number;
+}
+
+// Base task structure from job_card/job_history
+interface BaseTask {
+  Job_Id: string;
+  Task_Id: string;
+  Task_Description: string;
+  Status: "Pending" | "Assigned" | "In Progress" | "Completed";
+  Estimated_Standard_Time: number;
+  Time_Started: string; // From job_card or job_history
+  Time_Taken_minutes: number | null; // From job_history or calculated from current task
+  Outcome_Score: number | null; // From job_history
+  VIN: string;
+  Make: string;
+  Model: string;
+}
+
+// EnrichedEngineerTask combines BaseTask with EngineerProfile data
+export type EnrichedEngineerTask = BaseTask & EngineerProfile;
+
+// Other types like Job and UnifiedTask might still be present, but EnrichedEngineerTask is key here.
 // The shape of data from your /jobs endpoint
 export interface CurrentTask {
   Date_Created: string;
@@ -76,4 +132,16 @@ export interface Job {
   totalTasks: number;
   // --- ADD THIS LINE ---
   derivedCompletionStatus: "Completed" | "In Progress" | "Not Started";
+}
+
+export interface TimelineTask {
+  Job_Id: string;
+  Task_Id: string;
+  Task_Description: string;
+  Status: "Pending" | "Assigned" | "In Progress" | "Completed";
+  Estimated_Standard_Time: number;
+  Time_Started: string | null;
+  Engineer_Id: string;
+  Engineer_Name: string;
+  Time_Taken_minutes: number | null;
 }
