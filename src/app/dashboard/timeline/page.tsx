@@ -24,7 +24,7 @@ export default function TimelinePage() {
         </p>
       </div>
       {/* The DatePicker will be integrated into the DailyTimeline component itself */}
-      <DailyTimeline />
+      {/* <DailyTimeline /> */}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { EngineerTaskFrequencyChart } from "@/components/dashboard/tasks-frequency-chart";
+import { EngineerTaskPerformanceChart } from "@/components/dashboard/engineer-task-performance-line-chart";
 
 export default function EngineerDetailPage() {
   const params = useParams();
@@ -103,8 +104,8 @@ export default function EngineerDetailPage() {
         date: format(parseISO(t.Time_Started), "MMM dd"),
         score: t.Outcome_Score!,
       }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Sort by date for line chart
-      .slice(-15);
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(-50);
 
     // Prepare data for Radar Chart
     const skillScores = engineer
@@ -113,6 +114,7 @@ export default function EngineerDetailPage() {
             ([key, value]) =>
               key.endsWith("_Score") &&
               !key.startsWith("Overall") &&
+              key !== "Outcome_Score" &&
               typeof value === "number",
           )
           .map(([key, value]) => ({
@@ -179,13 +181,14 @@ export default function EngineerDetailPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle>Performance Trend</CardTitle>
+            <CardTitle>Performance by Task Type</CardTitle>
             <CardDescription>
-              Outcome score of the last 15 completed tasks.
+              View this engineer&apos;s outcome scores for a selected task type
+              over time.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <EngineerPerformanceLineChart data={processedData.lineChartData} />
+            <EngineerTaskPerformanceChart tasks={tasks} />
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
@@ -200,6 +203,17 @@ export default function EngineerDetailPage() {
           </CardContent>
         </Card>
       </div>
+      <Card className="lg:col-span-4">
+        <CardHeader>
+          <CardTitle>Performance Trend</CardTitle>
+          <CardDescription>
+            Outcome score of the last 50 completed tasks.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EngineerPerformanceLineChart data={processedData.lineChartData} />
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Task Completion Frequency</CardTitle>
