@@ -6,7 +6,7 @@ from datetime import datetime
 # In a real application, this data might be loaded from a central config file or database
 # For the POC, we define it here so this script can run independently for testing.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
+DB_PATH = os.path.join(BASE_DIR, 'database/workshopA.db')
 
 TASKS_DATA = {
     'T001': {'name': 'Oil Change', 'time': 25},
@@ -40,10 +40,33 @@ JOB_TO_TASKS_MAPPING = {
     'Custom Service': []
 }
 
+def get_next_job_id_from_db():
+    """
+    Retrieves the maximum Job_Id currently in the database,
+    increments it, and returns it. Handles empty table.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(CAST(SUBSTR(Job_Id, 4) AS INTEGER)) FROM job_card")
+        max_id = cursor.fetchone()[0]
+        
+        # If no records exist, start from 1, otherwise increment max_id
+        next_int_id = (max_id if max_id is not None else 0) + 1
+        return f"JOB{next_int_id}"
+    except sqlite3.Error as e:
+        print(f"Error getting next Job_Id: {e}")
+        # Fallback to a timestamp-based ID or raise an error
+        return f"JOB{int(datetime.now().timestamp())}" 
+    finally:
+        if conn:
+            conn.close()
+
 def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selected_tasks=None):
     """
     Accepts data from a UI/frontend and creates job card records in the database.
-    Returns True on success, False on failure.
+    Returns a tuple: (True, success_message) or (False, error_message).
     """
     if job_name == 'Custom Service' and selected_tasks:
         tasks_to_perform = selected_tasks
@@ -55,12 +78,18 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
         return False, f"No tasks found for job '{job_name}'"
         
     records_to_insert = []
+    
+    # --- Generate the JOB ID here, once for all tasks in this job ---
+    job_id_with_prefix = get_next_job_id_from_db() 
+    
     for task_id in tasks_to_perform:
         task_info = TASKS_DATA.get(task_id)
         if not task_info:
-            continue # Skip if task_id is invalid
+            continue
             
         record = (
+            # Use the newly generated JOB ID
+            job_id_with_prefix, 
             job_name, task_id, task_info['name'], urgency, vin, make, model,
             mileage, task_info['time'], 'Pending', datetime.now().date()
         )
@@ -70,23 +99,28 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        # --- Your SQL remains the same, assuming Job_Id is TEXT ---
         sql = """
         INSERT INTO job_card (
-            Job_Name, Task_ID, Task_Description, Urgency, VIN, Make, Model,
+            Job_Id, Job_Name, Task_Id, Task_Description, Urgency, VIN, Make, Model,
             Mileage, Estimated_Standard_Time, Status, Date_Created
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         cursor.executemany(sql, records_to_insert)
         conn.commit()
         
-        print(f"Successfully inserted {len(records_to_insert)} tasks for Job '{job_name}' into job_card.")
-        return True
+        success_message = f"Successfully inserted {len(records_to_insert)} tasks for Job '{job_name}' with Job_Id '{job_id_with_prefix}'."
+        print(success_message)
+        return True, success_message, job_id_with_prefix
     except sqlite3.Error as e:
-        print(f"Database error in create_job_from_ui_input: {e}")
-        return False, f"Database error: {e}"
+        error_message = f"Database error: {e}"
+        print(error_message)
+        return False, error_message
     finally:
         if conn:
             conn.close()
+
+
 
 if __name__ == '__main__':
     # This simulates the data coming from the UI form

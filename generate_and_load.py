@@ -133,6 +133,22 @@ def standardize_columns(df, mapping):
                 break # Move to the next standard name once a match is found
     df.rename(columns=rename_dict, inplace=True)
     return df
+def get_level_from_experience(years):
+    """
+    Derives an engineer's level ('Junior', 'Senior', 'Master')
+    based on their years of experience.
+    """
+    if years is None:
+        # Handle cases where experience might not be set for an engineer
+        return None
+    
+    # Using 'elif' ensures that the conditions are mutually exclusive
+    if years <= 7:
+        return "Junior"
+    elif years <= 15: # This condition is only checked if years > 7
+        return "Senior"
+    else: # This handles any experience greater than 15
+        return "Master"
 
 def get_tenure_from_level(level):
     """Calculates tenure in months based on experience level as per business rules."""
