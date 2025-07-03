@@ -127,7 +127,6 @@ export function NewJobForm() {
           errorData.error ?? "Failed to create job in the database.",
         );
       }
-
       const createJobResult = (await createJobResponse.json()) as {
         message: string;
         job_id: string;
