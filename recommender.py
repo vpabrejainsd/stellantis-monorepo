@@ -4,7 +4,7 @@ import sqlite3
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-job_data_path = "data/generated_flat_job_history_FINAL.xlsx"
+job_data_path = "data/generated_flat_job_history.xlsx"
 df_jobs = pd.read_excel(job_data_path)
 
 # --- Feature engineering ---
@@ -16,7 +16,7 @@ df_jobs['Urgency_Level'] = df_jobs['Urgency'].map(urgency_map)
 df_jobs['Time_Pressure_Score'] = df_jobs['Urgency_Level'] * df_jobs['Job_Duration_Deviation']
 
 
-engineer_task_features = df_jobs.groupby(['Assigned_Engineer_Id', 'Task_Id']).agg({
+engineer_task_features = df_jobs.groupby(['Engineer_Id', 'Task_Id']).agg({
     'Outcome_Score': 'mean',
     'Engineer_Efficiency': 'mean',
     'Time_Pressure_Score': 'mean',
@@ -24,7 +24,7 @@ engineer_task_features = df_jobs.groupby(['Assigned_Engineer_Id', 'Task_Id']).ag
 }).reset_index()
 
 feature_cols = ['Outcome_Score', 'Engineer_Efficiency', 'Time_Pressure_Score', 'Urgency_Level']
-engineer_task_matrix = engineer_task_features.set_index(['Task_Id', 'Assigned_Engineer_Id'])[feature_cols]
+engineer_task_matrix = engineer_task_features.set_index(['Task_Id', 'Engineer_Id'])[feature_cols]
 task_profiles = engineer_task_matrix.groupby('Task_Id').mean()
 
 DB_PATH = "database/workshop.db"
@@ -57,6 +57,7 @@ def get_top_similar_tasks(task_id, top_k=3):
 def recommend_engineers_memory_cf(task_id, top_n=5):
 
     if task_id not in task_profiles.index:
+        print(f"Task '{task_id}' not found in profiles.")
         return f"Task '{task_id}' not found in profiles."
 
     task_vector = task_profiles.loc[task_id].values.reshape(1, -1)
@@ -64,6 +65,7 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
     try:
         engineers_for_task = engineer_task_matrix.loc[task_id]
     except KeyError:
+        print(f"No engineers found for task '{task_id}'.")
         return f"No engineers found for task '{task_id}'."
 
     engineer_vectors = engineers_for_task.values
@@ -94,5 +96,7 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
             f"Engineers {eng_list} are recommended because they performed well on tasks similar to {task_id} "
             f"— such as {task_list} — with similarity scores of {score_list}."
         )
+        print(filtered_recommendations)
+        return filtered_recommendations, reason
     else:
         return [], f"No available engineers found for task {task_id}."

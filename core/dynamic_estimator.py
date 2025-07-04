@@ -55,7 +55,7 @@ def get_dynamic_job_estimate(job_id):
 
         if not assigned_tasks:
             return False, "No assigned tasks found for this Job_ID, or the job is not yet fully assigned."
-
+        tasks_completed = []
         total_dynamic_estimate = 0
         print("Calculating individual task estimates:")
 
@@ -63,10 +63,16 @@ def get_dynamic_job_estimate(job_id):
             success, task_estimate = get_dynamic_task_estimate(task['Task_ID'], task['Engineer_Id'], conn)
             if success:
                 total_dynamic_estimate += task_estimate
+                tasks_completed.append({"task_id": task['Task_ID'], "engineer_id": task['Engineer_Id'], "estimate": task_estimate})
             else:
                 return False, f"Could not calculate estimate for Task {task['Task_ID']}"
             
-        return True, total_dynamic_estimate
+        return True, {
+            "Job_ID": job_id,
+            "Total_Estimate_Minutes": total_dynamic_estimate,
+            "Tasks": tasks_completed,
+            "Calculated_At": datetime.now().isoformat()
+        }
 
     except sqlite3.Error as e:
         return False, f"Database error: {e}"

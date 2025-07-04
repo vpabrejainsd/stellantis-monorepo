@@ -1,0 +1,23 @@
+[
+  {
+    "VIN": "LFUA69MM5FW5T818C",
+    "assigned_engineer_id": "ENG013",
+    "date_completed": "2024-07-20 00:00:00",
+    "engineer_level": "Master",
+    "engineer_name": "Patricia Hall",
+    "estimated_standard_time": 25,
+    "job_id": "JOB1001",
+    "job_name": "Intermediate Service",
+    "make": "Fiat",
+    "mileage": 45862,
+    "model": "500",
+    "outcome_score": 4,
+    "status": "Completed",
+    "task_description": "Oil Change",
+    "task_id": "T001",
+    "time_ended": "2024-07-20 14:54:00",
+    "time_started": "2024-07-20 14:22:00",
+    "time_taken": 32,
+    "urgency": "Low"
+  }
+]

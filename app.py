@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
+from core.dynamic_estimator import get_dynamic_job_estimate
 from core.job_card_creator import create_job_from_ui_input
 from recommender import recommend_engineers_memory_cf
 from job_manager import get_connection, get_task_ids_for_job, update_task_assignment 
@@ -302,10 +303,19 @@ def create_job_endpoint():
 @app.route("/jobs", methods=["GET"])
 def get_jobs():
     jobs_df = fetch_all_jobs()
-    print(jobs_df)
     jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0.0)
+
     jobs = jobs_df.to_dict(orient="records")
-    print(jobs_df)
+
+    for job in jobs:
+        job_id = job.get("Job_Id")
+        success, result = get_dynamic_job_estimate(job_id)
+        print(f"Dynamic estimate for Job_ID {job_id}: {result}")
+        if success:
+            job["Dynamic_Estimate"] = result["Total_Estimate_Minutes"]
+            job["Estimate_Details"] = result
+        else:
+            job["Dynamic_Estimate"] = "N/A"
     return jsonify(jobs)
 
 
@@ -349,7 +359,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
             recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
             recommendation_reason = reason # Store the reason for this task
             print(recommendations)
-            if isinstance(recommendations, str):
+            if isinstance(recommendations, str) or recommendations == []:
                 status = f"Failed: Recommendation system error - {recommendations}"
             else:
                 for eng_id, score in recommendations:
