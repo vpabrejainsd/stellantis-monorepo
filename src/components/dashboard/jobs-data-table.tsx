@@ -405,6 +405,7 @@ function TaskDetailsSubComponent({
             <TableHead>Task</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Assigned Engineer</TableHead>
+            <TableHead>Suitability Score</TableHead>
             <TableHead>Est. Time</TableHead>
             <TableHead>Time Taken</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -442,6 +443,11 @@ function TaskDetailsSubComponent({
                       {task.Engineer_Level}
                     </div>
                   )}
+                </TableCell>
+                <TableCell>
+                  {task.Suitability_Score === null
+                    ? "N/A"
+                    : task.Suitability_Score * 100 + "%"}
                 </TableCell>
                 <TableCell>{task.Estimated_Standard_Time} mins</TableCell>
                 <TableCell>
@@ -592,10 +598,10 @@ export function JobsDataTable() {
         fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs`),
         fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/job-history`),
       ]);
-
+      // console.log("jobs: ", await jobsResponse.json());
       const currentTasks = (await jobsResponse.json()) as CurrentTask[];
       const historyTasks = (await historyResponse.json()) as HistoryTask[];
-
+      console.log("Current Tasks:", currentTasks);
       const normalizedCurrentTasks: UnifiedTask[] = currentTasks.map(
         (task) => ({
           ...task,
@@ -614,6 +620,7 @@ export function JobsDataTable() {
           Engineer_Name: task.engineer_name,
           Engineer_Level: task.engineer_level,
           Estimated_Standard_Time: task.estimated_standard_time,
+          Suitability_Score: null,
           timeTaken: task.time_taken,
           VIN: task.VIN,
           Make: task.make,

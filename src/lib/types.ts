@@ -60,8 +60,9 @@ export type EnrichedEngineerTask = BaseTask & EngineerProfile;
 export interface CurrentTask {
   Date_Created: string;
   Engineer_Id: string | null;
-  Engineer_Level: string | null; // Add this
-  Engineer_Name: string | null; // Add this
+  Engineer_Level: string | null;
+  Engineer_Name: string | null;
+  Suitability_Score: number | null;
   Estimated_Standard_Time: number;
   Job_Id: string;
   Job_Name: string;
@@ -106,8 +107,9 @@ export interface UnifiedTask {
   Task_Description: string;
   Status: "Pending" | "Assigned" | "In Progress" | "Completed";
   Engineer_Id: string | null;
-  Engineer_Name: string | null; // Add this
-  Engineer_Level: string | null; // Add this
+  Engineer_Name: string | null;
+  Engineer_Level: string | null;
+  Suitability_Score: number | null;
   Estimated_Standard_Time: number;
   timeTaken: number;
   VIN: string;
