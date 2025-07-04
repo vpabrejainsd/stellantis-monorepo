@@ -28,8 +28,8 @@ import { type DateRange } from "react-day-picker";
 
 import { JOB_TYPES } from "@/lib/constants";
 import {
-  type CurrentTask,
-  type HistoryTask,
+  type JobTask,
+  type JobHistoryTask,
   type Job,
   type UnifiedTask,
 } from "@/lib/types";
@@ -70,6 +70,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../ui/dialog";
+import { useEffect } from "react";
+import { ProgressBar } from "./progress-bar";
 
 // --- HELPER FUNCTIONS FOR CONDITIONAL STYLING ---
 const getJobRowColor = (status: Job["derivedCompletionStatus"]): string => {
@@ -396,9 +398,21 @@ function TaskDetailsSubComponent({
   tasks: UnifiedTask[];
   onTaskUpdate: () => void;
 }) {
+  const [progress, setProgress] = React.useState(0);
+  useEffect(() => {
+    const tasksLenght = tasks.length;
+    const completedTasks = tasks.filter((t) => t.Status === "Completed").length;
+    setProgress((completedTasks / tasksLenght) * 100);
+  }, [tasks]);
   return (
     <div className="bg-muted/50 p-4">
-      <h4 className="mb-2 font-semibold">Tasks for this Job:</h4>
+      <div>
+        <div className="flex items-center justify-center gap-1">
+          <ProgressBar value={progress} key={tasks[0]?.Job_Id} />
+          <h1>{progress.toPrecision(3)}%</h1>
+        </div>
+        <h4 className="mb-2 font-semibold">Tasks for this Job:</h4>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
@@ -406,7 +420,8 @@ function TaskDetailsSubComponent({
             <TableHead>Status</TableHead>
             <TableHead>Assigned Engineer</TableHead>
             <TableHead>Suitability Score</TableHead>
-            <TableHead>Est. Time</TableHead>
+            <TableHead>Standard Est. Time</TableHead>
+            <TableHead>Dynamic Est.</TableHead>
             <TableHead>Time Taken</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -450,6 +465,16 @@ function TaskDetailsSubComponent({
                     : task.Suitability_Score * 100 + "%"}
                 </TableCell>
                 <TableCell>{task.Estimated_Standard_Time} mins</TableCell>
+                <TableCell>
+                  {
+                    task.Estimate_Details?.Tasks.filter(
+                      (t) =>
+                        t.task_id === task.Task_Id &&
+                        t.engineer_id === task.Engineer_Id,
+                    ).find((t) => t.task_id == task.Task_Id)?.estimate
+                  }{" "}
+                  mins
+                </TableCell>
                 <TableCell>
                   {task.timeTaken > 0 ? `${task.timeTaken} mins` : "-"}
                 </TableCell>
@@ -555,6 +580,15 @@ const columns: ColumnDef<Job>[] = [
     },
   },
   {
+    accessorKey: "Dynamic_Estimated_Time",
+    header: "Dynamic Est. Time",
+    cell: ({ row }) => {
+      return typeof row.original.Dynamic_Estimated_Time === "number"
+        ? row.original.Dynamic_Estimated_Time + " mins"
+        : row.original.Dynamic_Estimated_Time;
+    },
+  },
+  {
     id: "actions",
     cell: () => (
       <DropdownMenu>
@@ -599,8 +633,8 @@ export function JobsDataTable() {
         fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/job-history`),
       ]);
       // console.log("jobs: ", await jobsResponse.json());
-      const currentTasks = (await jobsResponse.json()) as CurrentTask[];
-      const historyTasks = (await historyResponse.json()) as HistoryTask[];
+      const currentTasks = (await jobsResponse.json()) as JobTask[];
+      const historyTasks = (await historyResponse.json()) as JobHistoryTask[];
       console.log("Current Tasks:", currentTasks);
       const normalizedCurrentTasks: UnifiedTask[] = currentTasks.map(
         (task) => ({
@@ -608,6 +642,9 @@ export function JobsDataTable() {
           timeTaken: task.Time_Started
             ? differenceInMinutes(new Date(), parseISO(task.Time_Started))
             : 0,
+          // These fields are only on /jobs
+          Dynamic_Estimate: task.Dynamic_Estimate,
+          Estimate_Details: task.Estimate_Details,
         }),
       );
       const normalizedHistoryTasks: UnifiedTask[] = historyTasks.map(
@@ -645,6 +682,7 @@ export function JobsDataTable() {
             tasks: [],
             completedTasks: 0,
             totalTasks: 0,
+            Dynamic_Estimated_Time: task.Dynamic_Estimate ?? "-",
             derivedCompletionStatus: "Not Started",
           };
           const currentJob = acc[task.Job_Id];
@@ -667,7 +705,13 @@ export function JobsDataTable() {
         {} as Record<string, Job>,
       );
 
-      setData(Object.values(groupedJobs));
+      setData(
+        Object.values(groupedJobs).sort((a, b) => {
+          const dateA = new Date(a.Date_Created).getTime();
+          const dateB = new Date(b.Date_Created).getTime();
+          return dateB - dateA;
+        }),
+      );
     } catch (error) {
       console.error("Failed to fetch and process job data:", error);
     } finally {

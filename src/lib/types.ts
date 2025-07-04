@@ -56,9 +56,22 @@ interface BaseTask {
 export type EnrichedEngineerTask = BaseTask & EngineerProfile;
 
 // Other types like Job and UnifiedTask might still be present, but EnrichedEngineerTask is key here.
-// The shape of data from your /jobs endpoint
-export interface CurrentTask {
+export interface EstimateDetails {
+  Calculated_At: string;
+  Job_ID: string;
+  Tasks: Array<{
+    engineer_id: string;
+    estimate: number;
+    task_id: string;
+  }>;
+  Total_Estimate_Minutes: number;
+}
+
+// /jobs (active jobs)
+export interface JobTask {
   Date_Created: string;
+  Dynamic_Estimate: number;
+  Estimate_Details: EstimateDetails;
   Engineer_Id: string | null;
   Engineer_Level: string | null;
   Engineer_Name: string | null;
@@ -77,8 +90,8 @@ export interface CurrentTask {
   VIN: string;
 }
 
-// The shape of data from your /job_history endpoint
-export interface HistoryTask {
+// /job-history (completed jobs)
+export interface JobHistoryTask {
   VIN: string;
   assigned_engineer_id: string;
   engineer_level: "Master" | "Senior" | "Junior";
@@ -100,7 +113,7 @@ export interface HistoryTask {
   urgency: string;
 }
 
-// A unified structure to hold all tasks, regardless of source
+// Unified task for table
 export interface UnifiedTask {
   Job_Id: string;
   Task_Id: string;
@@ -111,6 +124,8 @@ export interface UnifiedTask {
   Engineer_Level: string | null;
   Suitability_Score: number | null;
   Estimated_Standard_Time: number;
+  Dynamic_Estimate?: number;
+  Estimate_Details?: EstimateDetails;
   timeTaken: number;
   VIN: string;
   Make: string;
@@ -131,7 +146,7 @@ export interface Job {
   tasks: UnifiedTask[];
   completedTasks: number;
   totalTasks: number;
-  // --- ADD THIS LINE ---
+  Dynamic_Estimated_Time: number | string;
   derivedCompletionStatus: "Completed" | "In Progress" | "Not Started";
 }
 
@@ -227,4 +242,15 @@ export interface JobHistoryTask {
   time_taken: number;
   estimated_standard_time: number;
   outcome_score: number;
+}
+
+export interface EstimateDetails {
+  Calculated_At: string;
+  Job_ID: string;
+  Tasks: Array<{
+    engineer_id: string;
+    estimate: number;
+    task_id: string;
+  }>;
+  Total_Estimate_Minutes: number;
 }
