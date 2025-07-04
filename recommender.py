@@ -27,9 +27,7 @@ feature_cols = ['Outcome_Score', 'Engineer_Efficiency', 'Time_Pressure_Score', '
 engineer_task_matrix = engineer_task_features.set_index(['Task_Id', 'Assigned_Engineer_Id'])[feature_cols]
 task_profiles = engineer_task_matrix.groupby('Task_Id').mean()
 
-
 DB_PATH = "database/workshop.db"
-
 def get_available_engineers_from_db():
     """Fetch available engineer IDs from the database."""
     conn = sqlite3.connect(DB_PATH)
@@ -96,7 +94,5 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
             f"Engineers {eng_list} are recommended because they performed well on tasks similar to {task_id} "
             f"— such as {task_list} — with similarity scores of {score_list}."
         )
-        print(filtered_recommendations)
-        return filtered_recommendations, reason
     else:
         return [], f"No available engineers found for task {task_id}."
