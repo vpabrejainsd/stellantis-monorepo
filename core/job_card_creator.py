@@ -91,7 +91,7 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
             # Use the newly generated JOB ID
             job_id_with_prefix, 
             job_name, task_id, task_info['name'], urgency, vin, make, model,
-            mileage, task_info['time'], 'Pending', datetime.now().date()
+            mileage, task_info['time'], 'Pending', datetime.now()
         )
         records_to_insert.append(record)
         

@@ -33,7 +33,7 @@ def fetch_unassigned_jobs():
 #         conn.commit()
 # In job_manager.py, replace the old function with this one
 
-def update_task_assignment(task_id, assigned_engineer_id):
+def update_task_assignment(task_id, assigned_engineer_id, score):
     """
     Updates the engineer details for a specific Task_ID in the job_card table.
 
@@ -80,9 +80,10 @@ def update_task_assignment(task_id, assigned_engineer_id):
                     Engineer_Id = ?, 
                     Engineer_Name = ?, 
                     Engineer_Level = ?, 
+                    Suitability_Score = ?,
                     Status = 'Assigned' 
                 WHERE Task_ID = ?
-            """, (assigned_engineer_id, engineer_name, derived_engineer_level, task_id))
+            """, (assigned_engineer_id, engineer_name, derived_engineer_level, score, task_id))
             
             conn.commit()
             print(f"Successfully assigned Engineer {assigned_engineer_id} ({engineer_name}, Level: {derived_engineer_level}) to Task {task_id}.")

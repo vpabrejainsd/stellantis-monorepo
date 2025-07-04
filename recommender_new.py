@@ -96,6 +96,7 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
             f"Engineers {eng_list} are recommended because they performed well on tasks similar to {task_id} "
             f"— such as {task_list} — with similarity scores of {score_list}."
         )
+        print(filtered_recommendations)
         return filtered_recommendations, reason
     else:
         return [], f"No available engineers found for task {task_id}."
