@@ -6,7 +6,7 @@ from datetime import datetime
 # In a real application, this data might be loaded from a central config file or database
 # For the POC, we define it here so this script can run independently for testing.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, 'database/workshopA.db')
+DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 
 TASKS_DATA = {
     'T001': {'name': 'Oil Change', 'time': 25},
@@ -91,7 +91,7 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
             # Use the newly generated JOB ID
             job_id_with_prefix, 
             job_name, task_id, task_info['name'], urgency, vin, make, model,
-            mileage, task_info['time'], 'Pending', datetime.now().date()
+            mileage, task_info['time'], 'Pending', datetime.now()
         )
         records_to_insert.append(record)
         

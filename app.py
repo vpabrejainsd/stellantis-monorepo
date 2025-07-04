@@ -2,7 +2,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from core.job_card_creator import create_job_from_ui_input
-from recommender_new import recommend_engineers_memory_cf
+from recommender import recommend_engineers_memory_cf
 from job_manager import get_connection, get_task_ids_for_job, update_task_assignment 
 import sqlite3
 from job_manager import (
@@ -27,7 +27,7 @@ CORS(app)
 #     response.headers.add('Access-Control-Allow-Methods', "*")
 #     return response
 
-DB_PATH = "database/workshopA.db"
+DB_PATH = "database/workshop.db"
 # def get_connection():
 #     return sqlite3.connect(DB_PATH, timeout=10)
 
@@ -302,7 +302,10 @@ def create_job_endpoint():
 @app.route("/jobs", methods=["GET"])
 def get_jobs():
     jobs_df = fetch_all_jobs()
+    print(jobs_df)
+    jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0.0)
     jobs = jobs_df.to_dict(orient="records")
+    print(jobs_df)
     return jsonify(jobs)
 
 
@@ -338,25 +341,31 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
     # Loop through each individual task
     for task_id in task_ids:
         engineer_assigned = None
+        engineer_score = None
         recommendation_reason = "No recommendation provided"
         status = "Failed: No available engineer"
 
         try:
             recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
             recommendation_reason = reason # Store the reason for this task
-
+            print(recommendations)
             if isinstance(recommendations, str):
                 status = f"Failed: Recommendation system error - {recommendations}"
             else:
                 for eng_id, score in recommendations:
+                    print(f"Checking availability for engineer {eng_id} with score {score}") # Log on backend
                     if check_availability(eng_id):
                         engineer_assigned = eng_id
+                        engineer_score = score
                         break
 
                 if engineer_assigned:
-                    update_task_assignment(task_id, engineer_assigned) # Use new update_task_assignment
+                    update_task_assignment(task_id, engineer_assigned, engineer_score) # Use new update_task_assignment
                     mark_engineer_unavailable(engineer_assigned)
                     status = "Assigned"
+                    if score is None:
+                        score = "N/A"  # Handle case where score is not provided
+                    print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {score}")
                 else:
                     status = "Failed: No available engineer found in recommendations"
 
@@ -367,6 +376,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         assignment_results.append({
             "task_id": task_id,
             "engineer_assigned": engineer_assigned,
+            "suitability_score": score,
             "status": status,
             "recommendation_reason": recommendation_reason
         })
