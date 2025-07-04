@@ -6,7 +6,7 @@ from datetime import datetime
 # In a real application, this data might be loaded from a central config file or database
 # For the POC, we define it here so this script can run independently for testing.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, 'database/workshopA.db')
+DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 
 TASKS_DATA = {
     'T001': {'name': 'Oil Change', 'time': 25},

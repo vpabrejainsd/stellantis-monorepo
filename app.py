@@ -2,7 +2,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from core.job_card_creator import create_job_from_ui_input
-from recommender_new import recommend_engineers_memory_cf
+from recommender import recommend_engineers_memory_cf
 from job_manager import get_connection, get_task_ids_for_job, update_task_assignment 
 import sqlite3
 from job_manager import (
@@ -27,7 +27,7 @@ CORS(app)
 #     response.headers.add('Access-Control-Allow-Methods', "*")
 #     return response
 
-DB_PATH = "database/workshopA.db"
+DB_PATH = "database/workshop.db"
 # def get_connection():
 #     return sqlite3.connect(DB_PATH, timeout=10)
 

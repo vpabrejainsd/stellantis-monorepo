@@ -3,7 +3,7 @@ import pandas as pd
 from generate_and_load import get_level_from_experience
 from recommender import recommend_engineers_memory_cf
 
-DB_PATH = "database/workshopA.db"
+DB_PATH = "database/workshop.db"
 
 def get_connection():
     return sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
