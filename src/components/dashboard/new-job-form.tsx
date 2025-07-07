@@ -366,40 +366,37 @@ export function NewJobForm() {
             <div>
               <h3 className="mb-4 text-lg font-semibold">Select Tasks</h3>
               <div className="bg-muted/30 space-y-2 rounded-md border p-4">
-                {Object.entries(ALL_TASKS).map(([taskId, taskInfo]) => {
-                  console.log(taskId, taskInfo);
-                  return (
-                    <FormField
-                      key={taskId}
-                      control={form.control}
-                      name="selectedTasks"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-y-0 space-x-3">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value?.includes(taskInfo.name)}
-                              onCheckedChange={(checked) => {
-                                return checked
-                                  ? field.onChange([
-                                      ...(field.value ?? []),
-                                      taskId,
-                                    ])
-                                  : field.onChange(
-                                      field.value?.filter(
-                                        (value) => value !== taskId,
-                                      ),
-                                    );
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {taskInfo.name}
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                  );
-                })}
+                {Object.entries(ALL_TASKS).map(([taskId, taskInfo]) => (
+                  <FormField
+                    key={taskId}
+                    control={form.control}
+                    name="selectedTasks"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-y-0 space-x-3">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value?.includes(taskInfo.name)}
+                            onCheckedChange={(checked) => {
+                              return checked
+                                ? field.onChange([
+                                    ...(field.value ?? []),
+                                    taskInfo.name,
+                                  ])
+                                : field.onChange(
+                                    field.value?.filter(
+                                      (value) => value !== taskInfo.name,
+                                    ),
+                                  );
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {taskInfo.name}
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                ))}
               </div>
             </div>
 
