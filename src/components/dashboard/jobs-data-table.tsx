@@ -399,11 +399,13 @@ function TaskDetailsSubComponent({
   onTaskUpdate: () => void;
 }) {
   const [progress, setProgress] = React.useState(0);
+
   useEffect(() => {
-    const tasksLenght = tasks.length;
-    const completedTasks = tasks.filter((t) => t.Status === "Completed").length;
-    setProgress((completedTasks / tasksLenght) * 100);
+    const total = tasks.length;
+    const done = tasks.filter((t) => t.Status === "Completed").length;
+    setProgress((done / total) * 100);
   }, [tasks]);
+
   return (
     <div className="bg-muted/50 p-4">
       <div>
@@ -428,14 +430,31 @@ function TaskDetailsSubComponent({
         </TableHeader>
         <TableBody>
           {tasks.map((task) => {
+            // row background
             const rowColor = getTaskRowColor(
               task.Status,
               task.timeTaken,
-              task.Estimated_Standard_Time,
+              task.Estimated_Standard_Time
             );
-            // Determine which actions are available based on the task status
+
+            // actions availability
             const canStart = task.Status === "Assigned";
             const canComplete = task.Status === "In Progress";
+
+            // compute standard vs dynamic & badge color
+            const standardTime = task.Estimated_Standard_Time;
+            const dynamicEstimate =
+              task.Estimate_Details?.Tasks.find(
+                (t) =>
+                  t.task_id === task.Task_Id &&
+                  t.engineer_id === task.Engineer_Id
+              )?.estimate ?? 0;
+            const badgeClass =
+              dynamicEstimate > standardTime
+                ? "bg-red-500 dark:bg-red-700"
+                : dynamicEstimate === standardTime
+                ? "bg-yellow-500 dark:bg-yellow-700"
+                : "bg-green-500 dark:bg-green-700";
 
             return (
               <TableRow key={task.Task_Id} className={rowColor}>
@@ -444,9 +463,7 @@ function TaskDetailsSubComponent({
                 </TableCell>
                 <TableCell>
                   <Badge
-                    variant={
-                      task.Status === "Completed" ? "outline" : "default"
-                    }
+                    variant={task.Status === "Completed" ? "outline" : "default"}
                   >
                     {task.Status}
                   </Badge>
@@ -460,24 +477,27 @@ function TaskDetailsSubComponent({
                   )}
                 </TableCell>
                 <TableCell>
-                  {task.Suitability_Score === null
+                  {task.Suitability_Score == null
                     ? "N/A"
-                    : task.Suitability_Score + "%"}
+                    : `${task.Suitability_Score}%`}
                 </TableCell>
-                <TableCell>{task.Estimated_Standard_Time} mins</TableCell>
+
+                {/* Standard estimate */}
+                <TableCell>{standardTime} mins</TableCell>
+
+                {/* Dynamic estimate with colored badge */}
                 <TableCell>
-                  {
-                    task.Estimate_Details?.Tasks.filter(
-                      (t) =>
-                        t.task_id === task.Task_Id &&
-                        t.engineer_id === task.Engineer_Id,
-                    ).find((t) => t.task_id == task.Task_Id)?.estimate
-                  }{" "}
-                  mins
+                  <Badge className={cn("px-2 py-1 rounded-full", badgeClass)}>
+                    {dynamicEstimate} mins
+                  </Badge>
                 </TableCell>
+
+                {/* Actual time taken */}
                 <TableCell>
                   {task.timeTaken > 0 ? `${task.timeTaken} mins` : "-"}
                 </TableCell>
+
+                {/* Actions dropdown */}
                 <TableCell className="text-right">
                   {task.Status !== "Completed" && (
                     <DropdownMenu>
@@ -488,7 +508,6 @@ function TaskDetailsSubComponent({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem disabled>Edit</DropdownMenuItem>
-                        {/* Conditionally render the correct action */}
                         {canStart && (
                           <StartTaskAction
                             task={task}
