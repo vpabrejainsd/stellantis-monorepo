@@ -24,7 +24,6 @@ def get_dynamic_task_estimate(task_id, engineer_id, conn):
 
     if engineer_avg_time:
         estimate = round(engineer_avg_time)
-        print(f"  - Task {task_id} (Eng: {engineer_id}): Found personal average time of {estimate} mins.")
         return True, estimate
     else:
         # NOTE: This assumes you have a 'task_definitions' table.
@@ -57,7 +56,6 @@ def get_dynamic_job_estimate(job_id):
             return False, "No assigned tasks found for this Job_ID, or the job is not yet fully assigned."
         tasks_completed = []
         total_dynamic_estimate = 0
-        print("Calculating individual task estimates:")
 
         for task in assigned_tasks:
             success, task_estimate = get_dynamic_task_estimate(task['Task_ID'], task['Engineer_Id'], conn)
@@ -97,7 +95,6 @@ if __name__ == '__main__':
         else:
             # Convert list of tuples to a simple list of strings
             job_ids_to_process = [job[0] for job in assigned_jobs]
-            print(f"Found {len(job_ids_to_process)} assigned jobs to process: {job_ids_to_process}")
 
             # 2. Loop through each job and calculate its estimate
             for job_id in job_ids_to_process:

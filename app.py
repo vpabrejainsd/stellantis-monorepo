@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from core.dynamic_estimator import get_dynamic_job_estimate
+from core.gemini_mapping import get_matching_services
 from core.job_card_creator import create_job_from_ui_input
 from recommender import recommend_engineers_memory_cf
 from job_manager import get_connection, get_task_ids_for_job, update_task_assignment 
@@ -318,6 +319,16 @@ def get_jobs():
             job["Dynamic_Estimate"] = "N/A"
     return jsonify(jobs)
 
+@app.route('/mapping-services', methods = ['POST'])
+def select_serv():
+    data = request.get_json()
+    user_input = data.get('description')
+
+    if not user_input:
+        return jsonify({"error": ""}), 400
+    
+    services = get_matching_services(user_input)
+    return jsonify({"services": services})
 
 @app.route("/jobs/unassigned", methods=["GET"])
 def get_unassigned_jobs():
