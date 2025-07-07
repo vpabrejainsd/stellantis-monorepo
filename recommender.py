@@ -118,7 +118,7 @@ df_jobs['Time_Pressure_Score'] = df_jobs['Urgency_Level']*df_jobs['Job_Duration_
 
 # Aggregate by (Task_Id, Engineer_Id)
 engineer_task_features = (
-    df_jobs.groupby(['Task_Id','Engineer_Id'])
+    df_jobs.groupby(['Task_Id','Engineer_ID'])
            .agg({
                'Outcome_Score':'mean',
                'Engineer_Efficiency':'mean',
@@ -130,7 +130,7 @@ engineer_task_features = (
 feature_cols = ['Outcome_Score','Engineer_Efficiency','Time_Pressure_Score','Urgency_Level']
 engineer_task_matrix = (
     engineer_task_features
-      .set_index(['Task_Id','Engineer_Id'])[feature_cols]
+      .set_index(['Task_Id','Engineer_ID'])[feature_cols]
 )
 task_profiles = engineer_task_matrix.groupby('Task_Id').mean()
 
@@ -138,7 +138,7 @@ task_profiles = engineer_task_matrix.groupby('Task_Id').mean()
 def get_available_engineers_from_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.execute(
-        "SELECT Engineer_Id FROM engineer_profiles WHERE Availability='Yes'"
+        "SELECT Engineer_ID FROM engineer_profiles WHERE Availability='Yes'"
     )
     available = {r[0] for r in cursor.fetchall()}
     conn.close()
@@ -170,11 +170,11 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
 
     # 4) Load static features for these engineers
     placeholders = ",".join("?" for _ in perf_series)
-    sql = f"SELECT Engineer_Id, Years_of_Experience, Customer_Rating, Avg_Job_Completion_Time, Specialization FROM engineer_profiles WHERE Engineer_Id IN ({placeholders})"
+    sql = f"SELECT Engineer_ID, Years_of_Experience, Customer_Rating, Avg_Job_Completion_Time, Specialization FROM engineer_profiles WHERE Engineer_ID IN ({placeholders})"
     conn = sqlite3.connect(DB_PATH)
     df_static = pd.read_sql(sql, conn, params=list(perf_series.index))
     conn.close()
-    df_static = df_static.set_index('Engineer_Id').loc[perf_series.index]
+    df_static = df_static.set_index('Engineer_ID').loc[perf_series.index]
 
     # 5) Compute z-scores
     df_static['z_E'] = (df_static['Years_of_Experience']-df_static['Years_of_Experience'].mean())/df_static['Years_of_Experience'].std(ddof=0)
@@ -202,9 +202,12 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
         scores = pd.Series(100.0,index=raw.index)
     df_static['Score'] = scores.round(2)
 
-    # 8) Select top-n
-    top = df_static['Score'].nlargest(top_n)
-    recommendations = list(zip(top.index.tolist(), top.tolist()))
+    top_df = df_static['Score'].nlargest(2).reset_index()
+    if len(top_df) < 2:
+        top_df = df_static['Score'].nlargest(1).reset_index()
+    top = top_df.loc[1]
+    recommendations = (top['Engineer_ID'], top['Score'])  # Return tuple
+
 
     # 9) Build reason
     eng_list = ', '.join(top.index)
