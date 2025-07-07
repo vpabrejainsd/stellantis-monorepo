@@ -46,12 +46,14 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "../ui/textarea";
+import { getTaskIdsFromNames } from "@/lib/utils";
 
 type NewJobFormValues = z.infer<typeof newJobFormSchema>;
-
 export function NewJobForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [isMapping, setIsMapping] = useState(false);
+  const [aiSuggestedTasks, setAiSuggestedTasks] = useState<string[]>([]);
   const form = useForm<NewJobFormValues>({
     resolver: zodResolver(newJobFormSchema),
     defaultValues: {
@@ -60,53 +62,66 @@ export function NewJobForm() {
       model: "",
       mileage: 0,
       urgency: "Normal",
-      jobName: undefined,
       selectedTasks: [],
+      description: undefined,
     },
   });
 
   const { watch, setValue } = form;
-  const watchedJobName = watch("jobName");
-
-  // Automatically set the correct preset tasks for non-custom jobs
-  useEffect(() => {
-    let taskIds: string[] = [];
-    if (watchedJobName === "Basic Service") {
-      taskIds = [...BASIC_SERVICE_TASK_IDS];
-    } else if (watchedJobName === "Intermediate Service") {
-      taskIds = [...INTERMEDIATE_SERVICE_TASK_IDS];
-    } else if (watchedJobName === "Full Service") {
-      taskIds = [...FULL_SERVICE_TASK_IDS];
+  const watchedDescription = watch("description");
+  async function handleAnalyzeProblems() {
+    if (!watchedDescription?.trim()) {
+      toast.error("Please enter a problem description first.");
+      return;
     }
-    if (watchedJobName !== "Custom Service") {
-      setValue("selectedTasks", taskIds, { shouldValidate: true });
+    setIsMapping(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_FLASK_API_URL}/mapping-services`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description: watchedDescription }),
+        },
+      );
+      if (!res.ok) {
+        throw new Error("Failed to map description to tasks.");
+      }
+      const data = await res.json();
+      if (Array.isArray(data.services)) {
+        setValue("selectedTasks", data.services, { shouldValidate: true });
+        setAiSuggestedTasks(data.services);
+        toast.success("Tasks mapped from description.");
+      } else {
+        toast.error("No tasks returned from mapping.");
+      }
+    } catch (e) {
+      toast.error("Could not map description to tasks.");
+    } finally {
+      setIsMapping(false);
     }
-  }, [watchedJobName, setValue]);
+  }
 
   async function onSubmit(data: NewJobFormValues) {
     setIsSubmitting(true);
     toast.info("Step 1: Creating job and tasks in the database...");
+    if (data.selectedTasks === undefined || data.selectedTasks.length === 0) {
+      toast.error("Cannot create a job with no tasks selected.");
+      setIsSubmitting(false);
+      return;
+    }
 
-    // Frontend no longer generates commonJobCardId here for the initial job creation
-    // Instead, it passes all relevant form data to the backend directly.
+    const ids = getTaskIdsFromNames(data.selectedTasks);
+    console.log(ids);
     const initialPayload = {
-      jobName: data.jobName,
+      jobName: "Custom Service",
       vin: data.vin,
       make: data.make,
       model: data.model,
       mileage: data.mileage,
       urgency: data.urgency,
-      selectedTasks: data.selectedTasks, // array of Task_IDs (e.g., ["T001", "T003"])
+      selectedTasks: ids,
     };
-
-    if (
-      initialPayload.selectedTasks === undefined ||
-      initialPayload.selectedTasks.length === 0
-    ) {
-      toast.error("Cannot create a job with no tasks selected.");
-      setIsSubmitting(false);
-      return;
-    }
 
     let generatedJobId: string | null = null; // To store the ID returned from Flask
 
@@ -198,41 +213,26 @@ export function NewJobForm() {
     }
   }
 
-  // Display selected tasks by name
-  const TasksDisplay = useMemo(() => {
-    if (!watchedJobName || watchedJobName === "Custom Service") return null;
-    const taskIds = form.getValues("selectedTasks") ?? [];
-    if (taskIds.length === 0) return null;
-
-    return (
-      <div className="bg-muted/50 space-y-4 rounded-md border p-4">
-        <h4 className="text-foreground font-semibold">Included Tasks</h4>
-        <ul className="list-inside list-disc pt-1 pl-2 text-sm">
-          {taskIds.map((taskId) => (
-            <li key={taskId}>
-              {ALL_TASKS[taskId as keyof typeof ALL_TASKS]?.name ?? taskId}
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }, [watchedJobName, form]);
-
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle>New Car & Job Intake</CardTitle>
         <CardDescription>
-          Enter car and job details to add a new job to the queue.
+          Enter car details and describe the problems. Tasks will be suggested
+          automatically.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <form
+            onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              console.log("Form validation errors:", errors);
+            })}
+            className="space-y-8"
+          >
+            {/* Car Details */}
             <div>
-              <h3 className="mb-4 text-lg font-semibold">
-                Car & Customer Details
-              </h3>
+              <h3 className="mb-4 text-lg font-semibold">Car Details</h3>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -291,32 +291,26 @@ export function NewJobForm() {
 
             <Separator />
 
+            {/* Problem Description & Urgency */}
             <div>
-              <h3 className="mb-4 text-lg font-semibold">Job Details</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <h3 className="mb-4 text-lg font-semibold">
+                Problem Description & Urgency
+              </h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
-                  name="jobName"
+                  name="description"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Job Type</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select a job type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {JOB_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Describe the car&apos;s problems</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe the issues in natural language..."
+                          className="max-h-40"
+                          rows={4}
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -333,7 +327,7 @@ export function NewJobForm() {
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select urgency level" />
+                            <SelectValue placeholder="Select urgency" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -349,59 +343,65 @@ export function NewJobForm() {
                   )}
                 />
               </div>
+              <div className="mt-2 flex">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleAnalyzeProblems}
+                  disabled={isMapping || !watchedDescription?.trim()}
+                >
+                  {isMapping ? "Analyzing..." : "Analyze Problems"}
+                </Button>
+                {aiSuggestedTasks.length > 0 && (
+                  <span className="ml-4 flex items-center gap-1 text-sm text-green-600">
+                    {"Tasks suggested! "}{" "}
+                    <b>{" Please review below and select the urgency."}</b>
+                  </span>
+                )}
+              </div>
             </div>
 
-            {TasksDisplay}
-
-            {watchedJobName === "Custom Service" && (
-              <FormField
-                control={form.control}
-                name="selectedTasks"
-                render={() => (
-                  <FormItem>
-                    <div className="mb-4">
-                      <FormLabel className="text-base font-semibold">
-                        Select Custom Tasks
-                      </FormLabel>
-                    </div>
-                    <div className="space-y-2 rounded-md border p-4">
-                      {Object.entries(ALL_TASKS).map(([taskId, taskInfo]) => (
-                        <FormField
-                          key={taskId}
-                          control={form.control}
-                          name="selectedTasks"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-y-0 space-x-3">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(taskId)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([
-                                          ...(field.value ?? []),
-                                          taskId,
-                                        ])
-                                      : field.onChange(
-                                          field.value?.filter(
-                                            (value) => value !== taskId,
-                                          ),
-                                        );
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                {taskInfo.name}
-                              </FormLabel>
-                            </FormItem>
-                          )}
-                        />
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            {/* Task Selection */}
+            <Separator />
+            <div>
+              <h3 className="mb-4 text-lg font-semibold">Select Tasks</h3>
+              <div className="bg-muted/30 space-y-2 rounded-md border p-4">
+                {Object.entries(ALL_TASKS).map(([taskId, taskInfo]) => {
+                  console.log(taskId, taskInfo);
+                  return (
+                    <FormField
+                      key={taskId}
+                      control={form.control}
+                      name="selectedTasks"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-y-0 space-x-3">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(taskInfo.name)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([
+                                      ...(field.value ?? []),
+                                      taskId,
+                                    ])
+                                  : field.onChange(
+                                      field.value?.filter(
+                                        (value) => value !== taskId,
+                                      ),
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {taskInfo.name}
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  );
+                })}
+              </div>
+            </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Creating..." : "Create Job"}

@@ -462,7 +462,7 @@ function TaskDetailsSubComponent({
                 <TableCell>
                   {task.Suitability_Score === null
                     ? "N/A"
-                    : task.Suitability_Score * 100 + "%"}
+                    : task.Suitability_Score + "%"}
                 </TableCell>
                 <TableCell>{task.Estimated_Standard_Time} mins</TableCell>
                 <TableCell>
