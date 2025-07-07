@@ -362,20 +362,20 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
             if isinstance(recommendations, str) or recommendations == []:
                 status = f"Failed: Recommendation system error - {recommendations}"
             else:
-                for eng_id, score in recommendations:
-                    print(f"Checking availability for engineer {eng_id} with score {score}") # Log on backend
+                for eng_id, eng_score in recommendations:
+                    print(f"Checking availability for engineer {eng_id} with score {eng_score}") # Log on backend
                     if check_availability(eng_id):
                         engineer_assigned = eng_id
-                        engineer_score = score
+                        engineer_score = eng_score
                         break
 
                 if engineer_assigned:
                     update_task_assignment(task_id, engineer_assigned, engineer_score) # Use new update_task_assignment
                     mark_engineer_unavailable(engineer_assigned)
                     status = "Assigned"
-                    if score is None:
-                        score = "N/A"  # Handle case where score is not provided
-                    print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {score}")
+                    if eng_score is None:
+                        eng_score = "N/A"  # Handle case where score is not provided
+                    print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {eng_score}")
                 else:
                     status = "Failed: No available engineer found in recommendations"
 
@@ -386,7 +386,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         assignment_results.append({
             "task_id": task_id,
             "engineer_assigned": engineer_assigned,
-            "suitability_score": score,
+            "suitability_score": engineer_score,
             "status": status,
             "recommendation_reason": recommendation_reason
         })
@@ -416,7 +416,7 @@ def assign_engineer_to_job():
         return jsonify({"error": recommendations}), 400
 
     assigned_engineer = None
-    for eng_id, score in recommendations:
+    for eng_id, eng_score in recommendations:
         if check_availability(eng_id):
             assigned_engineer = eng_id
             break
