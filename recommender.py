@@ -196,16 +196,17 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
 
     # 7) Min-max scale to [0,100]
     rmin, rmax = raw.min(), raw.max()
-    if rmax>rmin:
-        scores = 100*(raw - rmin)/(rmax - rmin)
-    else:
-        scores = pd.Series(100.0,index=raw.index)
-    df_static['Score'] = scores.round(2)
+    # if rmax>rmin:
+    #     scores = 100*(raw - rmin)/(rmax - rmin)
+    # else:
+    #     scores = pd.Series(100.0,index=raw.index)
+    # df_static['Score'] = scores.round(2)
+    df_static['Score'] = raw.round(2)
 
     top_df = df_static['Score'].nlargest(2).reset_index()
     if len(top_df) < 2:
         top_df = df_static['Score'].nlargest(1).reset_index()
-    top = top_df.loc[1]
+    top = top_df.loc[0]
     recommendations = (top['Engineer_ID'], top['Score'])  # Return tuple
 
 
