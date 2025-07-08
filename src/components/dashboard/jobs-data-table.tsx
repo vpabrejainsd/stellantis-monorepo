@@ -449,6 +449,7 @@ function TaskDetailsSubComponent({
                   t.task_id === task.Task_Id &&
                   t.engineer_id === task.Engineer_Id
               )?.estimate ?? 0;
+            
             const badgeClass =
               dynamicEstimate > standardTime
                 ? "bg-red-500 dark:bg-red-700"
@@ -456,6 +457,13 @@ function TaskDetailsSubComponent({
                 ? "bg-yellow-500 dark:bg-yellow-700"
                 : "bg-green-500 dark:bg-green-700";
 
+            const suitability = task.Suitability_Score ?? 0;
+            const suitabilityBadgeClass =
+              suitability < 60
+                ? "bg-red-500 dark:bg-red-700"
+                : suitability <= 85
+                ? "bg-yellow-500 dark:bg-yellow-700"
+                : "bg-green-500 dark:bg-green-700";
             return (
               <TableRow key={task.Task_Id} className={rowColor}>
                 <TableCell className="font-medium">
@@ -477,11 +485,19 @@ function TaskDetailsSubComponent({
                   )}
                 </TableCell>
                 <TableCell>
-                  {task.Suitability_Score == null
-                    ? "N/A"
-                    : `${task.Suitability_Score}%`}
-                </TableCell>
-
+                {task.Suitability_Score == null ? (
+                  "N/A"
+                ) : (
+                  <Badge
+                    className={cn(
+                      "px-2 py-1 rounded-full",
+                      suitabilityBadgeClass
+                    )}
+                  >
+                    {`${task.Suitability_Score}%`}
+                  </Badge>
+                )}
+              </TableCell>
                 {/* Standard estimate */}
                 <TableCell>{standardTime} mins</TableCell>
 
