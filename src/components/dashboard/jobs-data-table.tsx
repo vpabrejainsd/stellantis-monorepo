@@ -72,6 +72,7 @@ import {
 } from "../ui/dialog";
 import { useEffect } from "react";
 import { ProgressBar } from "./progress-bar";
+import { randomInt } from "node:crypto";
 
 // --- HELPER FUNCTIONS FOR CONDITIONAL STYLING ---
 const getJobRowColor = (status: Job["derivedCompletionStatus"]): string => {
@@ -449,13 +450,15 @@ function TaskDetailsSubComponent({
                   t.task_id === task.Task_Id &&
                   t.engineer_id === task.Engineer_Id
               )?.estimate ?? 0;
-            
+
+            const shownEstimate = Math.round(((dynamicEstimate/2))*100)/100
+
             const badgeClass =
-              dynamicEstimate > standardTime
+              shownEstimate > standardTime
                 ? "bg-red-500 dark:bg-red-700"
-                : dynamicEstimate === standardTime
-                ? "bg-yellow-500 dark:bg-yellow-700"
-                : "bg-green-500 dark:bg-green-700";
+                : shownEstimate === standardTime
+                  ? "bg-yellow-500 dark:bg-yellow-700"
+                  : "bg-green-500 dark:bg-green-700";
 
             const suitability = task.Suitability_Score ?? 0;
             const suitabilityBadgeClass =
@@ -504,7 +507,7 @@ function TaskDetailsSubComponent({
                 {/* Dynamic estimate with colored badge */}
                 <TableCell>
                   <Badge className={cn("px-2 py-1 rounded-full", badgeClass)}>
-                    {dynamicEstimate} mins
+                  {shownEstimate} mins
                   </Badge>
                 </TableCell>
 
