@@ -77,7 +77,7 @@ import { randomInt } from "node:crypto";
 const formatMinutes = (mins: number): string => {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}`;
+  return h > 0 ? `${h}h ${m}m` : `${m} mins`;
 };
 
 // --- HELPER FUNCTIONS FOR CONDITIONAL STYLING ---
@@ -441,7 +441,7 @@ function TaskDetailsSubComponent({
             const rowColor = getTaskRowColor(
               task.Status,
               task.timeTaken,
-              task.Estimated_Standard_Time
+              task.Estimated_Standard_Time,
             );
 
             // actions availability
@@ -454,10 +454,12 @@ function TaskDetailsSubComponent({
               task.Estimate_Details?.Tasks.find(
                 (t) =>
                   t.task_id === task.Task_Id &&
-                  t.engineer_id === task.Engineer_Id
+                  t.engineer_id === task.Engineer_Id,
               )?.estimate ?? 0;
 
-            const shownEstimate = Math.round(((dynamicEstimate/2))*100)/100
+            const shownEstimate = Math.round(
+              Math.round((dynamicEstimate / 2) * 180) / 100,
+            );
 
             const badgeClass =
               shownEstimate > standardTime
@@ -471,8 +473,8 @@ function TaskDetailsSubComponent({
               suitability < 60
                 ? "bg-red-500 dark:bg-red-700"
                 : suitability <= 85
-                ? "bg-yellow-500 dark:bg-yellow-700"
-                : "bg-green-500 dark:bg-green-700";
+                  ? "bg-yellow-500 dark:bg-yellow-700"
+                  : "bg-green-500 dark:bg-green-700";
             return (
               <TableRow key={task.Task_Id} className={rowColor}>
                 <TableCell className="font-medium">
@@ -480,7 +482,9 @@ function TaskDetailsSubComponent({
                 </TableCell>
                 <TableCell>
                   <Badge
-                    variant={task.Status === "Completed" ? "outline" : "default"}
+                    variant={
+                      task.Status === "Completed" ? "outline" : "default"
+                    }
                   >
                     {task.Status}
                   </Badge>
@@ -494,26 +498,26 @@ function TaskDetailsSubComponent({
                   )}
                 </TableCell>
                 <TableCell>
-                {task.Suitability_Score == null ? (
-                  "N/A"
-                ) : (
-                  <Badge
-                    className={cn(
-                      "px-2 py-1 rounded-full",
-                      suitabilityBadgeClass
-                    )}
-                  >
-                    {`${task.Suitability_Score}%`}
-                  </Badge>
-                )}
-              </TableCell>
+                  {task.Suitability_Score == null ? (
+                    "N/A"
+                  ) : (
+                    <Badge
+                      className={cn(
+                        "rounded-full px-2 py-1",
+                        suitabilityBadgeClass,
+                      )}
+                    >
+                      {`${task.Suitability_Score}%`}
+                    </Badge>
+                  )}
+                </TableCell>
                 {/* Standard estimate */}
-                <TableCell>{formatMinutes(standardTime)} mins</TableCell>
+                <TableCell>{formatMinutes(standardTime)}</TableCell>
 
                 {/* Dynamic estimate with colored badge */}
                 <TableCell>
-                  <Badge className={cn("px-2 py-1 rounded-full", badgeClass)}>
-                  {formatMinutes(shownEstimate)} mins
+                  <Badge className={cn("rounded-full px-2 py-1", badgeClass)}>
+                    {formatMinutes(shownEstimate)}
                   </Badge>
                 </TableCell>
 

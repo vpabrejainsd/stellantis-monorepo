@@ -12,7 +12,7 @@ export const newJobFormSchema = z.object({
     .int()
     .positive("Mileage must be a positive number"),
   urgency: z.enum(URGENCY_LEVELS),
-
+  jobType: z.enum(JOB_TYPES),
   // This field now holds the selected Task IDs
   selectedTasks: z.array(z.string()).optional(),
   description: z.string().optional(),
