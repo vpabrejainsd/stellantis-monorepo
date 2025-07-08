@@ -1,16 +1,11 @@
-# In core/dynamic_estimator.py
 import sqlite3
 import os
 from datetime import datetime
-
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 
 def get_dynamic_task_estimate(task_id, engineer_id, conn):
-    """
-    Calculates an engineer's personal estimated time for a single task.
-    """
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -57,7 +52,6 @@ def get_dynamic_job_estimate(job_id):
             return False, "No assigned tasks found for this Job_ID, or the job is not yet fully assigned."
 
         total_dynamic_estimate = 0
-        print("Calculating individual task estimates:")
 
         for task in assigned_tasks:
             success, task_estimate = get_dynamic_task_estimate(task['Task_ID'], task['Engineer_Id'], conn)
