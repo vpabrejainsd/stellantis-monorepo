@@ -35,7 +35,6 @@ const managerNavItems: NavItem[] = [
   { href: "/dashboard/create-job", label: "Create Job", icon: PlusCircle },
   { href: "/dashboard/jobs", label: "All Jobs", icon: Package },
   { href: "/dashboard/engineers", label: "Engineers", icon: Wrench },
-  { href: "/dashboard/timeline", label: "Timeline", icon: CalendarClock },
 ];
 
 interface AppSidebarProps {
