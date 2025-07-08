@@ -457,7 +457,9 @@ function TaskDetailsSubComponent({
                   t.engineer_id === task.Engineer_Id,
               )?.estimate ?? 0;
 
-            const shownEstimate = Math.round((dynamicEstimate / 2) * 125) / 100;
+            const shownEstimate = Math.round(
+              Math.round((dynamicEstimate / 2) * 180) / 100,
+            );
 
             const badgeClass =
               shownEstimate > standardTime
