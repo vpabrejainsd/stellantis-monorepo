@@ -9,26 +9,26 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 
 TASKS_DATA = {
-    'T001': {'name': 'Oil Change', 'time': 25},
-    'T002': {'name': 'Oil Filter Replacement', 'time': 15},
-    'T003': {'name': 'Air Filter Check', 'time': 15},
-    'T004': {'name': 'Fluid Levels Check', 'time': 30},
-    'T005': {'name': 'Tyre Pressure Check', 'time': 15},
-    'T006': {'name': 'Visual Inspection', 'time': 20},
-    'T007': {'name': 'Brake Inspection', 'time': 30},
-    'T008': {'name': 'Tyre Condition and Alignment Check', 'time': 30},
-    'T009': {'name': 'Battery Check', 'time': 25},
-    'T010': {'name': 'Exhaust System Inspection', 'time': 45},
-    'T011': {'name': 'Steering and Suspension Check', 'time': 60},
-    'T012': {'name': 'Lights and Wipers Check', 'time': 20},
-    'T013': {'name': 'Fuel System Inspection', 'time': 65},
-    'T014': {'name': 'Transmission Check', 'time': 120},
-    'T015': {'name': 'Spark Plugs Replacement', 'time': 180},
-    'T016': {'name': 'Timing Belt Inspection', 'time': 35},
-    'T017': {'name': 'Wheel Alignment and Balancing', 'time': 30},
-    'T018': {'name': 'Cabin Filter Replacement', 'time': 20},
-    'T019': {'name': 'Comprehensive Diagnostic Check', 'time': 120},
-    'T020': {'name': 'Underbody Inspection', 'time': 60}
+    'T001': {'name': 'Oil Change', 'time': 35},
+    'T002': {'name': 'Oil Filter Replacement', 'time': 45},
+    'T003': {'name': 'Air Filter Check', 'time': 35},
+    'T004': {'name': 'Fluid Levels Check', 'time': 65},
+    'T005': {'name': 'Tyre Pressure Check', 'time': 35},
+    'T006': {'name': 'Visual Inspection', 'time': 35},
+    'T007': {'name': 'Brake Inspection', 'time': 55},
+    'T008': {'name': 'Tyre Condition and Alignment Check', 'time': 70},
+    'T009': {'name': 'Battery Check', 'time': 45},
+    'T010': {'name': 'Exhaust System Inspection', 'time': 65},
+    'T011': {'name': 'Steering and Suspension Check', 'time': 85},
+    'T012': {'name': 'Lights and Wipers Check', 'time': 35},
+    'T013': {'name': 'Fuel System Inspection', 'time': 120},
+    'T014': {'name': 'Transmission Check', 'time': 150},
+    'T015': {'name': 'Spark Plugs Replacement', 'time': 240},
+    'T016': {'name': 'Timing Belt Inspection', 'time': 65},
+    'T017': {'name': 'Wheel Alignment and Balancing', 'time': 75},
+    'T018': {'name': 'Cabin Filter Replacement', 'time': 45},
+    'T019': {'name': 'Comprehensive Diagnostic Check', 'time': 300},
+    'T020': {'name': 'Underbody Inspection', 'time': 120}
 }
 BASIC_SERVICE_TASKS = ['T001', 'T002', 'T003', 'T004', 'T005', 'T006']
 INTERMEDIATE_SERVICE_TASKS = BASIC_SERVICE_TASKS + ['T007', 'T008', 'T009', 'T010', 'T011', 'T012']
