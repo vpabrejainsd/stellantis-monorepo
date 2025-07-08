@@ -74,6 +74,12 @@ import { useEffect } from "react";
 import { ProgressBar } from "./progress-bar";
 import { randomInt } from "node:crypto";
 
+const formatMinutes = (mins: number): string => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}`;
+};
+
 // --- HELPER FUNCTIONS FOR CONDITIONAL STYLING ---
 const getJobRowColor = (status: Job["derivedCompletionStatus"]): string => {
   if (status === "Completed") return "bg-green-100/50 dark:bg-green-900/30";
@@ -502,18 +508,18 @@ function TaskDetailsSubComponent({
                 )}
               </TableCell>
                 {/* Standard estimate */}
-                <TableCell>{standardTime} mins</TableCell>
+                <TableCell>{formatMinutes(standardTime)} mins</TableCell>
 
                 {/* Dynamic estimate with colored badge */}
                 <TableCell>
                   <Badge className={cn("px-2 py-1 rounded-full", badgeClass)}>
-                  {shownEstimate} mins
+                  {formatMinutes(shownEstimate)} mins
                   </Badge>
                 </TableCell>
 
                 {/* Actual time taken */}
                 <TableCell>
-                  {task.timeTaken > 0 ? `${task.timeTaken} mins` : "-"}
+                  {task.timeTaken > 0 ? formatMinutes(task.timeTaken) : "-"}
                 </TableCell>
 
                 {/* Actions dropdown */}
@@ -622,7 +628,7 @@ const columns: ColumnDef<Job>[] = [
     header: "Dynamic Est. Time",
     cell: ({ row }) => {
       return typeof row.original.Dynamic_Estimated_Time === "number"
-        ? row.original.Dynamic_Estimated_Time + " mins"
+        ? formatMinutes(row.original.Dynamic_Estimated_Time)
         : row.original.Dynamic_Estimated_Time;
     },
   },
