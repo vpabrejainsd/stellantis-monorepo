@@ -42,6 +42,37 @@ def get_matching_services(user_input):
     prompt = f"""
 You're a helpful assistant. A supervisor has written: "{user_input}".
 Which of these services are most relevant?
+Look out for keywords and phrases for these three categories:
+1. Basic Service
+2. Intermediate Service
+3. Full Service
+Look out for their synonyms and related terms.
+
+based on the keywords the following services must be added into the list:
+1. Basic Service:
+  "Oil Change"
+  "Oil Filter Replacement"
+  "Air Filter Check"
+  "Fluid Levels Check"
+  "Tyre Pressure Check"
+  "Visual Inspection"
+2. Intermediate Service:
+  "Oil Change"
+  "Oil Filter Replacement"
+  "Air Filter Check"
+  "Fluid Levels Check"
+  "Tyre Pressure Check"
+  "Visual Inspection"
+  "Brake Inspection"
+  "Tyre Condition and Alignment Check"
+  "Battery Check"
+  "Exhaust System Inspection"
+  "Steering and Suspension Check"
+  "Lights and Wipers Check"
+3. Full Service:
+{', '.join(SERVICES)}
+
+ALSO take into account of the mileage of the vehicle to choose the services.
 
 Available services:
 {', '.join(SERVICES)}
