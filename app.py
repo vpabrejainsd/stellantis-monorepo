@@ -1,6 +1,8 @@
 from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
+from core.dynamic_estimator import get_dynamic_job_estimate
+from core.gemini_mapping import get_matching_services
 from core.job_card_creator import create_job_from_ui_input
 from recommender import recommend_engineers_memory_cf
 from job_manager import get_connection, get_task_ids_for_job, update_task_assignment 
@@ -302,12 +304,31 @@ def create_job_endpoint():
 @app.route("/jobs", methods=["GET"])
 def get_jobs():
     jobs_df = fetch_all_jobs()
-    print(jobs_df)
     jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0.0)
+
     jobs = jobs_df.to_dict(orient="records")
-    print(jobs_df)
+
+    for job in jobs:
+        job_id = job.get("Job_Id")
+        success, result = get_dynamic_job_estimate(job_id)
+        print(f"Dynamic estimate for Job_ID {job_id}: {result}")
+        if success:
+            job["Dynamic_Estimate"] = result["Total_Estimate_Minutes"]
+            job["Estimate_Details"] = result
+        else:
+            job["Dynamic_Estimate"] = "N/A"
     return jsonify(jobs)
 
+@app.route('/mapping-services', methods = ['POST'])
+def select_serv():
+    data = request.get_json()
+    user_input = data.get('description')
+
+    if not user_input:
+        return jsonify({"error": ""}), 400
+    
+    services = get_matching_services(user_input)
+    return jsonify({"services": services})
 
 @app.route("/jobs/unassigned", methods=["GET"])
 def get_unassigned_jobs():
@@ -348,24 +369,17 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         try:
             recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
             recommendation_reason = reason # Store the reason for this task
-            print(recommendations)
             if isinstance(recommendations, str):
                 status = f"Failed: Recommendation system error - {recommendations}"
             else:
-                for eng_id, score in recommendations:
-                    print(f"Checking availability for engineer {eng_id} with score {score}") # Log on backend
-                    if check_availability(eng_id):
-                        engineer_assigned = eng_id
-                        engineer_score = score
-                        break
-
+                engineer_assigned, engineer_score = recommendations
                 if engineer_assigned:
                     update_task_assignment(task_id, engineer_assigned, engineer_score) # Use new update_task_assignment
                     mark_engineer_unavailable(engineer_assigned)
                     status = "Assigned"
-                    if score is None:
-                        score = "N/A"  # Handle case where score is not provided
-                    print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {score}")
+                    if engineer_score is None:
+                        engineer_score = "N/A"  # Handle case where score is not provided
+                    print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {engineer_score}")
                 else:
                     status = "Failed: No available engineer found in recommendations"
 
@@ -376,7 +390,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         assignment_results.append({
             "task_id": task_id,
             "engineer_assigned": engineer_assigned,
-            "suitability_score": score,
+            "suitability_score": engineer_score,
             "status": status,
             "recommendation_reason": recommendation_reason
         })
@@ -389,40 +403,40 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         }
     ), 200
 
-@app.route("/jobs/assign", methods=["POST"])
-def assign_engineer_to_job():
-    data = request.get_json()
-    job_card_id = data.get("job_card_id")
+# @app.route("/jobs/assign", methods=["POST"])
+# def assign_engineer_to_job():
+#     data = request.get_json()
+#     job_card_id = data.get("job_card_id")
 
-    if not job_card_id:
-        return jsonify({"error": "Missing job_card_id"}), 400
+#     if not job_card_id:
+#         return jsonify({"error": "Missing job_card_id"}), 400
 
-    task_id = get_task_id_for_job(job_card_id)
-    if not task_id:
-        return jsonify({"error": "Job_Card_ID not found"}), 404
+#     task_id = get_task_id_for_job(job_card_id)
+#     if not task_id:
+#         return jsonify({"error": "Job_Card_ID not found"}), 404
 
-    recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
-    if isinstance(recommendations, str):
-        return jsonify({"error": recommendations}), 400
+#     recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
+#     if isinstance(recommendations, str):
+#         return jsonify({"error": recommendations}), 400
 
-    assigned_engineer = None
-    for eng_id, score in recommendations:
-        if check_availability(eng_id):
-            assigned_engineer = eng_id
-            break
+#     assigned_engineer = None
+#     for eng_id, eng_score in recommendations:
+#         if check_availability(eng_id):
+#             assigned_engineer = eng_id
+#             break
 
-    if not assigned_engineer:
-        return jsonify({"error": "No available engineer found"}), 409
+#     if not assigned_engineer:
+#         return jsonify({"error": "No available engineer found"}), 409
 
-    update_job_assignment(job_card_id, assigned_engineer)
-    mark_engineer_unavailable(assigned_engineer)
+#     update_job_assignment(job_card_id, assigned_engineer)
+#     mark_engineer_unavailable(assigned_engineer)
 
-    return jsonify(
-        {
-            "message": f"Engineer {assigned_engineer} assigned to job {job_card_id}",
-            "recommendation_reason": reason,
-        }
-    ), 200
+#     return jsonify(
+#         {
+#             "message": f"Engineer {assigned_engineer} assigned to job {job_card_id}",
+#             "recommendation_reason": reason,
+#         }
+#     ), 200
 
 
 @app.route("/jobs/complete", methods=["POST"])

@@ -16,7 +16,7 @@ def get_dynamic_task_estimate(task_id, engineer_id, conn):
     
     result = cursor.fetchone()
     engineer_avg_time = result[0] if result and result[0] is not None else None
-
+    
     cursor.execute("SELECT Estimated_Standard_Time FROM job_card WHERE Task_Id = ?", (task_id,))
     task_def_result = cursor.fetchone()
     standard_estimate = task_def_result[0] if task_def_result else 60 # Default to 60 if not found
@@ -61,17 +61,23 @@ def get_dynamic_job_estimate(job_id):
 
         if not assigned_tasks:
             return False, "No assigned tasks found for this Job_ID, or the job is not yet fully assigned."
-
+        tasks_completed = []
         total_dynamic_estimate = 0
 
         for task in assigned_tasks:
             success, task_estimate = get_dynamic_task_estimate(task['Task_ID'], task['Engineer_Id'], conn)
             if success:
                 total_dynamic_estimate += task_estimate
+                tasks_completed.append({"task_id": task['Task_ID'], "engineer_id": task['Engineer_Id'], "estimate": task_estimate})
             else:
                 return False, f"Could not calculate estimate for Task {task['Task_ID']}"
             
-        return True, total_dynamic_estimate
+        return True, {
+            "Job_ID": job_id,
+            "Total_Estimate_Minutes": total_dynamic_estimate,
+            "Tasks": tasks_completed,
+            "Calculated_At": datetime.now().isoformat()
+        }
 
     except sqlite3.Error as e:
         return False, f"Database error: {e}"
@@ -96,7 +102,6 @@ if __name__ == '__main__':
         else:
             # Convert list of tuples to a simple list of strings
             job_ids_to_process = [job[0] for job in assigned_jobs]
-            print(f"Found {len(job_ids_to_process)} assigned jobs to process: {job_ids_to_process}")
 
             # 2. Loop through each job and calculate its estimate
             for job_id in job_ids_to_process:
@@ -120,7 +125,7 @@ if __name__ == '__main__':
     # 4. Display the final structured output
     # In a real application, this list of dictionaries would be converted to JSON
     # and sent to the frontend portal.
-    print("\n\n" + "="*60)
+    '''print("\n\n" + "="*60)
     print("           Dynamic Job Estimate Report (For Testing)")
     print("="*60)
     
@@ -140,7 +145,7 @@ if __name__ == '__main__':
                 print(f"{job_id:<15} | {str(time):<25} | {status}")
             
     print("="*60)
-    print("\nProcess complete.")
+    print("\nProcess complete.")'''
 
-    '''import json
-    print(json.dumps(job_estimates, indent=4))'''
+    import json
+    print(json.dumps(job_estimates, indent=4))
