@@ -17,21 +17,32 @@ def get_dynamic_task_estimate(task_id, engineer_id, conn):
     result = cursor.fetchone()
     engineer_avg_time = result[0] if result and result[0] is not None else None
 
-    if engineer_avg_time:
-        estimate = round(engineer_avg_time)
-        print(f"  - Task {task_id} (Eng: {engineer_id}): Found personal average time of {estimate} mins.")
-        return True, estimate
+    cursor.execute("SELECT Estimated_Standard_Time FROM job_card WHERE Task_Id = ?", (task_id,))
+    task_def_result = cursor.fetchone()
+    standard_estimate = task_def_result[0] if task_def_result else 60 # Default to 60 if not found
+
+    cursor.execute("SELECT Years_of_Experience FROM engineer_profiles WHERE engineer_id = ?", (engineer_id,))
+    eng_profile_result = cursor.fetchone()
+    experience_level = eng_profile_result[0] if eng_profile_result else 'Junior' # Default to Junior
+
+    final_estimate = 0
+    if engineer_avg_time is None:
+        # If no history, rely 100% on the standard estimate
+        print(f"  - Task {task_id} (Eng: {engineer_id}, Level: {experience_level}): No history. Using standard time.")
+        final_estimate = standard_estimate
     else:
-        # NOTE: This assumes you have a 'task_definitions' table.
-        cursor.execute("SELECT estimated_time_minutes FROM task_definitions WHERE task_id = ?", (task_id,))
-        fallback_result = cursor.fetchone()
-        if fallback_result:
-            standard_estimate = fallback_result[0]
-            print(f"  - Task {task_id} (Eng: {engineer_id}): No history found. Using standard time of {standard_estimate} mins.")
-            return True, standard_estimate
-        else:
-            print(f"  - Task {task_id}: CRITICAL_ERROR - No standard time found!")
-            return False, 60
+        # Apply weights based on experience level
+        if experience_level == 'Master':
+            weight = 0.7
+        elif experience_level == 'Senior':
+            weight = 0.5
+        else: # Junior
+            weight = 0.3
+        
+        final_estimate = (engineer_avg_time * weight) + (standard_estimate * (1 - weight))
+        print(f"  - Task {task_id} (Eng: {engineer_id}, Level: {experience_level}): Blending personal avg ({engineer_avg_time:.0f}) and standard time ({standard_estimate}) with {weight*100:.0f}% weight.")
+
+    return True, round(final_estimate)
 
 def get_dynamic_job_estimate(job_id):
     conn = None
@@ -109,7 +120,7 @@ if __name__ == '__main__':
     # 4. Display the final structured output
     # In a real application, this list of dictionaries would be converted to JSON
     # and sent to the frontend portal.
-    '''print("\n\n" + "="*60)
+    print("\n\n" + "="*60)
     print("           Dynamic Job Estimate Report (For Testing)")
     print("="*60)
     
@@ -128,8 +139,8 @@ if __name__ == '__main__':
             
                 print(f"{job_id:<15} | {str(time):<25} | {status}")
             
-    print("="*60)'''
+    print("="*60)
     print("\nProcess complete.")
 
-    import json
-    print(json.dumps(job_estimates, indent=4))
+    '''import json
+    print(json.dumps(job_estimates, indent=4))'''
