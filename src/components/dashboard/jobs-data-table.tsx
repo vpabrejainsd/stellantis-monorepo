@@ -472,7 +472,7 @@ function TaskDetailsSubComponent({
             const suitabilityBadgeClass =
               suitability < 60
                 ? "bg-red-500 dark:bg-red-700"
-                : suitability <= 85
+                : suitability <= 80
                   ? "bg-yellow-500 dark:bg-yellow-700"
                   : "bg-green-500 dark:bg-green-700";
             return (
@@ -632,7 +632,9 @@ const columns: ColumnDef<Job>[] = [
     header: "Dynamic Est. Time",
     cell: ({ row }) => {
       return typeof row.original.Dynamic_Estimated_Time === "number"
-        ? formatMinutes(row.original.Dynamic_Estimated_Time)
+        ? formatMinutes(
+            Math.round((row.original.Dynamic_Estimated_Time / 2) * 1.8),
+          )
         : row.original.Dynamic_Estimated_Time;
     },
   },
