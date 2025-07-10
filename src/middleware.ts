@@ -1,23 +1,40 @@
-// src/middleware.ts
-
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-// Define the routes that are protected and require authentication.
 const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)", // Protects /dashboard and all its sub-routes
+  "/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)", // all routes except static files
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) await auth.protect();
+  const { userId } = await auth();
+  const url = req.nextUrl;
+
+  // Redirect away from root route `/`
+  if (url.pathname === "/") {
+    return NextResponse.redirect(
+      new URL(userId ? "/dashboard" : "/sign-in", req.url),
+    );
+  }
+
+  // Redirect unauthenticated users trying to access protected routes (except /sign-in)
+  if (
+    !userId &&
+    isProtectedRoute(req) &&
+    url.pathname !== "/sign-in" &&
+    url.pathname !== "/sign-up"
+  ) {
+    return NextResponse.redirect(new URL("/sign-in", req.url));
+  }
+
+  // Prevent signed-in users from seeing /sign-in
+  if (userId && (url.pathname === "/sign-in" || url.pathname === "/sign-up")) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  return NextResponse.next();
 });
 
 export const config = {
-  // The following matcher runs middleware on all routes
-  // except static assets.
-  matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
-  ],
+  // Match all routes (excluding static files)
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };
