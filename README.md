@@ -1,29 +1,63 @@
-# Create T3 App
+# Stellantis Frontend
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+## Overview
 
-## What's next? How do I make an app with this?
+This is the frontend application for the Stellantis project, built with Next.js and the T3 Stack.
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+## Prerequisites
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+*   Node.js
+*   A package manager like `npm`.
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+## Environment Variables
 
-## Learn More
+To run this project, you will need to create a `.env.local` file in the root of the directory and add the following environment variables.
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+**Clerk Authentication**
+- NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="YOUR_CLERK_PUBLISHABLE_KEY"
+- CLERK_SECRET_KEY="YOUR_CLERK_SECRET_KEY"
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+**Clerk Redirects**
+- NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+- NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+- NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/dashboard
+- NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=/sync-user
+- NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL="/dashboard"
+- NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL="/dashboard"
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+**Supabase Database**
+- NEXT_PUBLIC_SUPABASE_URL="YOUR_SUPABASE_URL"
+- NEXT_PUBLIC_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
+- DATABASE_URL="YOUR_SUPABASE_DATABASE_URL"
+- DIRECT_URL="YOUR_SUPABASE_DIRECT_URL"
 
-## How do I deploy this?
+**Backend API**
+- NEXT_PUBLIC_FLASK_API_URL="http://127.0.0.1:4001"
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+
+## Getting Started
+
+1.  **Clone the Repository**
+    ```
+    git clone https://github.com/Haabeel/stellantis-frontend
+    cd stellantis-frontend
+    ```
+
+2.  **Install Dependencies**
+    Use your preferred package manager to install the project dependencies.
+    ```
+    npm install
+    ```
+
+3.  **Run the Development Server**
+    Start the local development server.
+    ```
+    npm run dev
+    ```
+    Open [http://localhost:4000](http://localhost:4000) with your browser to see the result.
+
+## Deployment
+
+The T3 Stack is designed for easy deployment to modern hosting platforms. The recommended and easiest way to deploy this application is to use **Vercel**.
+
+Check out the official [T3 Stack deployment documentation](https://create.t3.gg/en/deployment/vercel) for a complete guide on deploying with Vercel. Guides for other platforms like Netlify and Docker are also available in the T3 Stack documentation.
