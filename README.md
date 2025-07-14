@@ -135,9 +135,9 @@ docker compose down
 
 ### 🐛 Troubleshooting
 
-Port conflicts: Ensure nothing else is running on 4000 (frontend) or 4001 (backend).
-Prisma errors: Verify that stellantis-frontend/prisma/schema.prisma exists and matches your database configuration.
-NPM auth failures: Confirm that .npmrc is present in stellantis-frontend/ with a valid token and not listed in .dockerignore.
+- Port conflicts: Ensure nothing else is running on 4000 (frontend) or 4001 (backend).
+- Prisma errors: Verify that stellantis-frontend/prisma/schema.prisma exists and matches your database configuration.
+- NPM auth failures: Confirm that .npmrc is present in stellantis-frontend/ with a valid token and not listed in .dockerignore.
 
 ### 🤝 Contributing
 
