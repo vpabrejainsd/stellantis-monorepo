@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String           @id @unique
+  firstName       String?
+  lastName        String?
+  email           String           @unique
+  role            String           @default("manager") // "manager" or "engineer"
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  engineerProfile EngineerProfile?
+}
+
+model EngineerProfile {
+  id                                  String   @id @default(cuid())
+  userId                              String   @unique
+  user                                User     @relation(fields: [userId], references: [id])
+  name                                String // Corresponds to Engineer_Name
+  availability                        Boolean  @default(true) // Corresponds to Availability
+  yearsOfExperience                   Int // Corresponds to Years_of_Experience
+  specialization                      String[] // Corresponds to Specialization (array of strings)
+  certifications                      String[] // Corresponds to Certifications (array of strings)
+  avgJobCompletionTime                Float
+  customerRating                      Float
+  overallBasicServiceScore            Float
+  overallCustomServiceScore           Float
+  overallFullServiceScore             Float
+  overallIntermediateServiceScore     Float
+  airFilterCheckScore                 Int
+  batteryCheckScore                   Int
+  brakeInspectionScore                Int
+  cabinFilterReplacementScore         Int
+  comprehensiveDiagnosticCheckScore   Int
+  exhaustSystemInspectionScore        Int
+  fluidLevelsCheckScore               Int
+  fuelSystemInspectionScore           Int
+  lightsAndWipersCheckScore           Int
+  oilChangeScore                      Int
+  oilFilterReplacementScore           Int
+  sparkPlugsReplacementScore          Int
+  steeringAndSuspensionCheckScore     Int
+  timingBeltInspectionScore           Int
+  transmissionCheckScore              Int
+  tyreConditionAndAlignmentCheckScore Int
+  tyrePressureCheckScore              Int
+  underbodyInspectionScore            Int
+  visualInspectionScore               Int
+  wheelAlignmentAndBalancingScore     Int
+  overallPerformanceScore             Int
+  jobs                                Job[] // Link to Job model
+
+  Task Task[]
+}
+
+model Car {
+  id                    String  @id @default(cuid())
+  vin                   String  @unique
+  make                  String
+  model                 String
+  mileage               Int
+  customerName          String? // Added for customer details
+  customerContactNumber String? // Added for customer details
+  jobs                  Job[]
+}
+
+model Job {
+  id                    String    @id @default(cuid())
+  jobName               String
+  urgency               String
+  status                String    @default("Created") // "Created", "Assigned", "In Progress", "Completed"
+  dateCreated           DateTime  @default(now())
+  dateCompleted         DateTime?
+  timeStarted           DateTime?
+  timeEnded             DateTime?
+  timeTakenMinutes      Int?
+  estimatedStandardTime Int?
+
+  carId String
+  car   Car    @relation(fields: [carId], references: [id])
+
+  tasks Task[]
+
+  EngineerProfile EngineerProfile[]
+}
+
+model Task {
+  id           String           @id @default(cuid())
+  description  String
+  status       String           @default("Pending")
+  outcomeScore Int?
+  jobId        String
+  job          Job              @relation(fields: [jobId], references: [id])
+  engineerId   String?
+  engineer     EngineerProfile? @relation(fields: [engineerId], references: [id])
+}
