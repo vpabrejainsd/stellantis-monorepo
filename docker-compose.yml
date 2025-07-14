@@ -1,0 +1,25 @@
+services:
+  frontend:
+    build:
+      context: ./stellantis-frontend
+      dockerfile: Dockerfile
+    env_file:
+      - ./stellantis-frontend/.env
+    volumes:
+      - ./stellantis-frontend:/app
+      - /app/node_modules
+    ports:
+      - "4000:4000"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./stellantis-backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./stellantis-backend/.env
+    volumes:
+      - ./stellantis-backend:/app
+    ports:
+      - "4001:4001"
