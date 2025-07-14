@@ -3,7 +3,7 @@
 
 import type { User } from "@prisma/client";
 import AppSidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/dynamic-header";
+import Header from "@/components/layout/header";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 interface DashboardShellProps {
@@ -16,14 +16,19 @@ export default function DashboardShell({
   children,
 }: DashboardShellProps) {
   return (
-    <SidebarProvider suppressHydrationWarning>
+    <SidebarProvider>
+      {/* The root is now a flex container to place sidebar and main content side-by-side */}
       <div className="flex h-screen w-full overflow-hidden">
+        {/* The sidebar is now a direct child of the flex container */}
         <AppSidebar userRole={user.role} />
 
-        <div className="flex flex-1 flex-col overflow-hidden">
+        {/* This div wraps the header and main content, taking up the remaining space */}
+        <div className="flex flex-1 flex-col">
+          {/* Header is made sticky to stay at the top */}
           <Header userRole={user.role} />
 
-          <main className="bg-muted/40 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {/* Main content area is scrollable independently */}
+          <main className="bg-muted/40 flex-1 overflow-y-auto p-4 md:p-8">
             {children}
           </main>
         </div>

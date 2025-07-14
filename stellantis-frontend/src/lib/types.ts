@@ -90,6 +90,29 @@ export interface JobTask {
   VIN: string;
 }
 
+// /job-history (completed jobs)
+export interface JobHistoryTask {
+  VIN: string;
+  assigned_engineer_id: string;
+  engineer_level: "Master" | "Senior" | "Junior";
+  engineer_name: string;
+  date_completed: string;
+  estimated_standard_time: number;
+  job_id: string;
+  job_name: string;
+  make: string;
+  mileage: number;
+  model: string;
+  outcome_score: number;
+  status: "Completed";
+  task_description: string;
+  task_id: string;
+  time_ended: string;
+  time_started: string;
+  time_taken: number;
+  urgency: string;
+}
+
 // Unified task for table
 export interface UnifiedTask {
   Job_Id: string;
@@ -219,8 +242,6 @@ export interface JobHistoryTask {
   time_taken: number;
   estimated_standard_time: number;
   outcome_score: number;
-  suitability_score?: number;
-  dynamic_estimated_time?: number;
 }
 
 export interface EstimateDetails {

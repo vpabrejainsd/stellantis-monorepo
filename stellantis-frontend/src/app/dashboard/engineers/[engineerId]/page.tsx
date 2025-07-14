@@ -19,20 +19,11 @@ import {
 } from "@/components/ui/card";
 import { EngineerTaskFrequencyChart } from "@/components/dashboard/tasks-frequency-chart";
 import { EngineerTaskPerformanceChart } from "@/components/dashboard/engineer-task-performance-line-chart";
-import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 export default function EngineerDetailPage() {
   const params = useParams();
   const engineerId = params.engineerId as string;
-  const isMobile = useIsMobile(); // ADDED: Use the hook
+
   const [engineer, setEngineer] = React.useState<EngineerProfile | null>(null);
   const [tasks, setTasks] = React.useState<EnrichedEngineerTask[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -160,39 +151,34 @@ export default function EngineerDetailPage() {
 
   if (isLoading) {
     return (
-      // CHANGED: Added responsive padding to skeleton container.
-      <div className="space-y-6 p-2 sm:p-6">
+      <div className="space-y-6">
         <Skeleton className="h-24 w-full" />
-        {/* CHANGED: Adjusted grid for skeleton cards to match main content. */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-          <Skeleton className="h-96 w-full lg:col-span-4" />
-          <Skeleton className="h-96 w-full lg:col-span-3" />
+        <div className="grid gap-4 md:grid-cols-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
-        <Skeleton className="h-96 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
     );
   }
 
   if (error) {
-    // CHANGED: Added responsive padding to error container.
-    return <div className="text-destructive p-4 text-center">{error}</div>;
+    return <div className="text-destructive text-center">{error}</div>;
   }
   if (!engineer) {
-    // CHANGED: Added responsive padding to no-data container.
     return (
-      <div className="text-muted-foreground p-4 text-center">
+      <div className="text-muted-foreground text-center">
         No engineer data available.
       </div>
     );
   }
 
   return (
-    // CHANGED: Added responsive padding to the main page container.
-    <div className="space-y-6 p-2 sm:p-6">
+    <div className="space-y-6">
       <EngineerHeader engineer={engineer} stats={processedData.stats} />
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
             <CardTitle>Performance by Task Type</CardTitle>
@@ -202,11 +188,9 @@ export default function EngineerDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Ensure EngineerTaskPerformanceChart handles its own responsiveness */}
             <EngineerTaskPerformanceChart tasks={tasks} />
           </CardContent>
         </Card>
-
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Skill Proficiency</CardTitle>
@@ -215,13 +199,11 @@ export default function EngineerDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Ensure EngineerSkillsRadarChart handles its own responsiveness */}
             <EngineerSkillsRadarChart data={processedData.radarChartData} />
           </CardContent>
         </Card>
       </div>
-
-      <Card>
+      <Card className="lg:col-span-4">
         <CardHeader>
           <CardTitle>Performance Trend</CardTitle>
           <CardDescription>
@@ -229,12 +211,9 @@ export default function EngineerDetailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Ensure EngineerPerformanceLineChart handles its own responsiveness */}
           <EngineerPerformanceLineChart data={processedData.lineChartData} />
         </CardContent>
       </Card>
-
-      {/* Card for Task Completion Frequency (Bar Chart) */}
       <Card>
         <CardHeader>
           <CardTitle>Task Completion Frequency</CardTitle>
@@ -244,54 +223,12 @@ export default function EngineerDetailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isMobile ? (
-            // --- MOBILE VIEW: Render a Table ---
-            <div className="max-h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="p-2 text-sm">Task</TableHead>
-                    <TableHead className="w-[80px] p-2 text-right text-sm">
-                      Count
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {processedData.taskFrequencyChartData.length > 0 ? (
-                    processedData.taskFrequencyChartData.map((task) => (
-                      <TableRow key={task.name}>
-                        {/* CHANGED: Added classes for text wrapping and word breaking */}
-                        <TableCell className="p-2 text-xs font-medium break-words whitespace-normal">
-                          {task.name}
-                        </TableCell>
-                        <TableCell className="p-2 text-right text-xs">
-                          {task.count}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={2} className="h-24 text-center">
-                        No completed tasks to display.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            // --- DESKTOP VIEW: Render the Bar Chart ---
-            <div className="w-full overflow-x-auto">
-              <EngineerTaskFrequencyChart
-                data={processedData.taskFrequencyChartData}
-                height={processedData.taskFrequencyChartHeight}
-              />
-            </div>
-          )}
+          <EngineerTaskFrequencyChart
+            data={processedData.taskFrequencyChartData}
+            height={processedData.taskFrequencyChartHeight}
+          />
         </CardContent>
       </Card>
-
-      {/* Card for All Tasks Table */}
       <Card>
         <CardHeader>
           <CardTitle>All Tasks</CardTitle>
@@ -300,11 +237,8 @@ export default function EngineerDetailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* The w-full overflow-x-auto wrapper around EngineerTasksTable is correct here. */}
-          {/* It ensures that only the table scrolls horizontally if it's too wide. */}
-          <div className="w-full overflow-x-auto">
-            <EngineerTasksTable tasks={tasks} />
-          </div>
+          <EngineerTasksTable tasks={tasks} />{" "}
+          {/* NEW: Display the tasks table */}
         </CardContent>
       </Card>
     </div>

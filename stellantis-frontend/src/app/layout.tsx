@@ -15,8 +15,8 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body className="overflow-hidden">
+      <html lang="en">
+        <body>
           <TRPCReactProvider>
             {children}
             <Toaster />
