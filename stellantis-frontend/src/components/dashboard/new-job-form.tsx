@@ -132,23 +132,30 @@ export function NewJobForm() {
         setValue("selectedTasks", mergedTasks, { shouldValidate: true });
         setAiSuggestedTasks(aiSuggestedNames); // Keep track of just AI suggested for messaging
 
+        // Determine if the job type needs to change to "Custom Service"
         const currentPresetTasks = jobTypeToTaskNames[watchedJobType] || [];
         const hasNewTasksBeyondPreset = aiSuggestedNames.some(
           (taskName: string) => !currentPresetTasks.includes(taskName),
         );
+        console.log(
+          selectedJobType,
+          watchedJobType,
+          hasNewTasksBeyondPreset,
+          form.getValues("selectedTasks"),
+        );
         if (hasNewTasksBeyondPreset) {
-          toast.success("Additional tasks have been added.");
-        }
-
-        if (hasNewTasksBeyondPreset) {
-          toast.success("Additional tasks have been mapped and added.");
+          setValue("jobType", "Custom Service");
+          setSelectedJobType("Custom Service"); // Update local state for rendering headers
+          toast.success(
+            "Tasks mapped and merged. Job type set to Custom Service.",
+          );
         } else {
-          toast.success("Tasks mapped and merged with your preset.");
+          toast.success("Tasks mapped and merged with existing preset.");
         }
       } else {
         toast.error("No tasks returned from mapping.");
       }
-    } catch {
+    } catch (e) {
       toast.error("Could not map description to tasks.");
     } finally {
       setIsMapping(false);
@@ -231,18 +238,14 @@ export function NewJobForm() {
         message: string;
         assignments: {
           task_id: string;
-          engineer_assigned: string | null;
-          suitability_score: number | null;
           status: string;
-          recommendation_reason: string | null;
-          dynamic_estimated_time: number | null;
+          engineer_assigned: string | null;
         }[];
       };
 
       const successes = assignmentSummary.assignments.filter(
         (a) => a.status === "Assigned",
       ).length;
-      console.log(successes, assignmentSummary.assignments);
       const failures = assignmentSummary.assignments.length - successes;
 
       if (failures === 0) {
@@ -284,10 +287,7 @@ export function NewJobForm() {
   return (
     <Card className="w-full">
       <CardHeader>
-        {/* CHANGED: Responsive font size */}
-        <CardTitle className="text-xl sm:text-2xl">
-          New Car & Job Intake
-        </CardTitle>
+        <CardTitle>New Car & Job Intake</CardTitle>
         <CardDescription>
           Enter car details and describe the problems. Tasks can be selected
           from a preset or suggested automatically.
@@ -303,11 +303,7 @@ export function NewJobForm() {
           >
             {/* Car Details */}
             <div>
-              {/* CHANGED: Responsive font size */}
-              <h3 className="mb-4 text-lg font-semibold md:text-xl">
-                Car Details
-              </h3>
-              {/* This grid is already responsive (stacks on mobile, 2 cols on md+), which is great. */}
+              <h3 className="mb-4 text-lg font-semibold">Car Details</h3>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -375,18 +371,15 @@ export function NewJobForm() {
 
             {/* Problem Description & Urgency */}
             <div>
-              {/* CHANGED: Responsive font size */}
-              <h3 className="mb-4 text-lg font-semibold md:text-xl">
+              <h3 className="mb-4 text-lg font-semibold">
                 Service Details & Urgency
               </h3>
-              {/* CHANGED: Using `lg` breakpoint for a better tablet experience */}
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="description"
                   render={({ field }) => (
-                    // CHANGED: Using `lg` breakpoint
-                    <FormItem className="lg:col-span-2">
+                    <FormItem className="md:col-span-2">
                       <FormLabel>Describe Additional Problems</FormLabel>
                       <FormControl>
                         <Textarea
@@ -401,7 +394,6 @@ export function NewJobForm() {
                   )}
                 />
                 <div className="flex w-full flex-col space-y-4">
-                  {/* These fields will stack nicely, which is good for all screen sizes */}
                   <FormField
                     control={form.control}
                     name="jobType"
@@ -418,7 +410,7 @@ export function NewJobForm() {
                               <SelectValue placeholder="Select job type" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="w-full">
                             {JOB_TYPES.map((type) => (
                               <SelectItem key={type} value={type}>
                                 {type}
@@ -459,8 +451,7 @@ export function NewJobForm() {
                   />
                 </div>
               </div>
-              {/* CHANGED: Flex layout for better wrapping on small screens */}
-              <div className="mt-4 flex flex-wrap items-center gap-4">
+              <div className="mt-4 flex">
                 <Button
                   type="button"
                   variant="secondary"
@@ -470,7 +461,7 @@ export function NewJobForm() {
                   {isMapping ? "Analyzing..." : "Analyze & Add Tasks"}
                 </Button>
                 {aiSuggestedTasks.length > 0 && (
-                  <span className="flex items-center gap-1 text-sm text-green-600">
+                  <span className="ml-4 flex items-center gap-1 text-sm text-green-600">
                     Tasks suggested! Please review below.
                   </span>
                 )}
@@ -481,11 +472,10 @@ export function NewJobForm() {
 
             {/* Task Selection */}
             <div>
-              {/* CHANGED: Responsive font size */}
-              <h3 className="mb-4 text-lg font-semibold md:text-xl">
+              <h3 className="mb-4 text-lg font-semibold">
                 {selectedJobType} Tasks
               </h3>
-              <div className="bg-muted/30 space-y-2 rounded-md border p-3 sm:p-4">
+              <div className="bg-muted/30 space-y-2 rounded-md border p-4">
                 {presetTaskNames.length > 0 ? (
                   presetTaskNames.map((taskName) => (
                     <FormItem
@@ -508,12 +498,8 @@ export function NewJobForm() {
 
               {addonTasks.length > 0 && (
                 <>
-                  {/* CHANGED: Responsive font size */}
-                  <h3 className="mt-6 mb-4 text-lg font-semibold md:text-xl">
-                    Add-ons
-                  </h3>
-                  {/* ADDED: Responsive padding */}
-                  <div className="bg-muted/30 space-y-2 rounded-md border p-3 sm:p-4">
+                  <h3 className="mt-6 mb-4 text-lg font-semibold">Add-ons</h3>
+                  <div className="bg-muted/30 space-y-2 rounded-md border p-4">
                     {addonTasks.map((taskInfo) => {
                       return (
                         <FormField
@@ -552,12 +538,9 @@ export function NewJobForm() {
               )}
             </div>
 
-            {/* ADDED: w-full and md:w-auto for button width control */}
-            <div className="flex justify-end">
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Job"}
-              </Button>
-            </div>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Job"}
+            </Button>
           </form>
         </Form>
       </CardContent>

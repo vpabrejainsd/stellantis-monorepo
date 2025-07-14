@@ -33,27 +33,6 @@ def fetch_unassigned_jobs():
 #         conn.commit()
 # In job_manager.py, replace the old function with this one
 
-def save_dynamic_estimated_time(task_id, job_id, dynamic_estimated_time):
-    """
-    Saves the dynamic estimated time for a specific Task_ID and Job_Card_ID.
-    This function will:
-    1. Update the job_card table with the dynamic estimated time.
-    2. Optionally, log this information for future reference.
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        try:
-            cursor.execute("""
-                UPDATE job_card 
-                SET Dynamic_Estimated_Time = ? 
-                WHERE Task_Id = ? AND Job_Id = ?
-            """, (dynamic_estimated_time, task_id, job_id))
-            conn.commit()
-            print(f"Dynamic estimated time {dynamic_estimated_time} saved for Task {task_id} in Job {job_id}.")
-        except sqlite3.Error as e:
-            print(f"Error saving dynamic estimated time: {e}")
-            conn.rollback()  # Roll back changes if the update fails
-
 def update_task_assignment(task_id, assigned_engineer_id, score):
     """
     Updates the engineer details for a specific Task_ID in the job_card table.

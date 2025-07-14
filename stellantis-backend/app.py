@@ -1,11 +1,11 @@
 from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
-from core.dynamic_estimator import get_dynamic_job_estimate, get_dynamic_task_estimate
+from core.dynamic_estimator import get_dynamic_job_estimate
 from core.gemini_mapping import get_matching_services
 from core.job_card_creator import create_job_from_ui_input
 from recommender import recommend_engineers_memory_cf
-from job_manager import get_connection, get_task_ids_for_job, save_dynamic_estimated_time, update_task_assignment 
+from job_manager import get_connection, get_task_ids_for_job, update_task_assignment 
 import sqlite3
 from job_manager import (
     fetch_all_jobs,
@@ -234,6 +234,73 @@ def create_job_endpoint():
     else:
         return jsonify({'error': message}), 500
 
+
+# @app.route("/create-job", methods=["POST"]) # Removed "OPTIONS" here, Flask-Cors handles it
+# def create_job():
+#     job_cards = request.get_json()
+#     if not isinstance(job_cards, list):
+#         return jsonify({'error': 'Input should be a list of job cards'}), 400
+
+#     conn = None # Initialize conn to None
+#     try:
+#         conn = get_connection() # Use the single, correct function
+#         cursor = conn.cursor()
+
+#         # Iterate and execute inserts
+#         for job in job_cards:
+#             cursor.execute("""
+#                 INSERT INTO job_card_table (
+#                     Assigned_Engineer_Id, Date_Created, Estimated_Standard_Time, Job_Card_ID,
+#                     Job_Name, Make, Mileage, Model, Outcome_Score, Status, Task_Description,
+#                     Task_ID, Time_Ended, Time_Started, Urgency, VIN
+#                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+#             """, (
+#                 job.get('Assigned_Engineer_Id'),
+#                 job.get('Date_Created'),
+#                 job.get('Estimated_Standard_Time'),
+#                 job.get('Job_Card_ID'), # Assuming these are now integers from frontend
+#                 job.get('Job_Name'),
+#                 job.get('Make'),
+#                 job.get('Mileage'),
+#                 job.get('Model'),
+#                 job.get('Outcome_Score'),
+#                 job.get('Status'),
+#                 job.get('Task_Description'),
+#                 job.get('Task_ID'), # Assuming these are now integers from frontend
+#                 job.get('Time_Ended'),
+#                 job.get('Time_Started'),
+#                 job.get('Urgency'),
+#                 job.get('VIN')
+#             ))
+#         conn.commit() # Commit all changes if loop completes without error
+#         return jsonify({'message': 'Job cards added successfully'}), 201
+
+#     except sqlite3.IntegrityError as e:
+#         # Catch specific integrity errors (e.g., UNIQUE constraint failure)
+#         if conn:
+#             conn.rollback() # Rollback changes if an integrity error occurs
+#         print(f"Integrity error: {e}")
+#         return jsonify({'error': 'Database integrity constraint violated.', 'details': str(e)}), 409 # 409 Conflict
+
+#     except sqlite3.Error as e:
+#         # Catch any other SQLite errors
+#         if conn:
+#             conn.rollback() # Rollback changes if any other error occurs
+#         print(f"Database error: {e}")
+#         return jsonify({'error': 'A database error occurred', 'details': str(e)}), 500
+
+#     except Exception as e:
+#         # Catch any other unexpected Python errors
+#         if conn:
+#             conn.rollback()
+#         print(f"An unexpected error occurred: {e}")
+#         return jsonify({'error': 'An unexpected server error occurred.', 'details': str(e)}), 500
+        
+#     finally:
+#         # This block ensures the connection is ALWAYS closed, regardless of success or failure.
+#         if conn:
+#             conn.close()
+
 @app.route("/jobs", methods=["GET"])
 def get_jobs():
     jobs_df = fetch_all_jobs()
@@ -296,7 +363,6 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
     for task_id in task_ids:
         engineer_assigned = None
         engineer_score = None
-        dynamic_estimated_time = None
         recommendation_reason = "No recommendation provided"
         status = "Failed: No available engineer"
 
@@ -311,8 +377,6 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
                     update_task_assignment(task_id, engineer_assigned, engineer_score) # Use new update_task_assignment
                     mark_engineer_unavailable(engineer_assigned)
                     status = "Assigned"
-                    _, dynamic_estimated_time = get_dynamic_task_estimate(task_id, engineer_assigned)
-                    save_dynamic_estimated_time(task_id, job_card_id, dynamic_estimated_time)
                     if engineer_score is None:
                         engineer_score = "N/A"  # Handle case where score is not provided
                     print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {engineer_score}")
@@ -322,14 +386,13 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         except Exception as e:
             status = f"Failed: Unexpected error during assignment - {str(e)}"
             print(f"Error assigning engineer to task {task_id}: {e}") # Log error on backend
-# !! TODO UPDATE THE JOB_CARD TABLE WITH DYNAMIC ESTIMATED TIME
+
         assignment_results.append({
             "task_id": task_id,
             "engineer_assigned": engineer_assigned,
             "suitability_score": engineer_score,
             "status": status,
-            "recommendation_reason": recommendation_reason,
-            "dynamic_estimated_time": dynamic_estimated_time
+            "recommendation_reason": recommendation_reason
         })
 
     # Return a summary of all assignments
@@ -340,6 +403,60 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         }
     ), 200
 
+# @app.route("/jobs/assign", methods=["POST"])
+# def assign_engineer_to_job():
+#     data = request.get_json()
+#     job_card_id = data.get("job_card_id")
+
+#     if not job_card_id:
+#         return jsonify({"error": "Missing job_card_id"}), 400
+
+#     task_id = get_task_id_for_job(job_card_id)
+#     if not task_id:
+#         return jsonify({"error": "Job_Card_ID not found"}), 404
+
+#     recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
+#     if isinstance(recommendations, str):
+#         return jsonify({"error": recommendations}), 400
+
+#     assigned_engineer = None
+#     for eng_id, eng_score in recommendations:
+#         if check_availability(eng_id):
+#             assigned_engineer = eng_id
+#             break
+
+#     if not assigned_engineer:
+#         return jsonify({"error": "No available engineer found"}), 409
+
+#     update_job_assignment(job_card_id, assigned_engineer)
+#     mark_engineer_unavailable(assigned_engineer)
+
+#     return jsonify(
+#         {
+#             "message": f"Engineer {assigned_engineer} assigned to job {job_card_id}",
+#             "recommendation_reason": reason,
+#         }
+#     ), 200
+
+
+@app.route("/jobs/complete", methods=["POST"])
+def complete_job_endpoint():
+    data = request.get_json()
+    job_card_id = data.get("job_card_id")
+    outcome_score = data.get("outcome_score")
+
+    if not job_card_id or outcome_score is None:
+        return jsonify({"error": "Missing job_card_id or outcome_score"}), 400
+
+    try:
+        complete_job(job_card_id, outcome_score)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify(
+        {"message": f"Job {job_card_id} marked as completed with score {outcome_score}"}
+    ), 200
+
 @app.route('/jobs/start-task', methods=['POST'])
 def start_task():
     """
@@ -348,7 +465,6 @@ def start_task():
     data = request.get_json()
     job_id = data.get('job_id')
     task_id = data.get('task_id')
-    time_started = data.get('time_started')
 
     if not job_id or not task_id:
         return jsonify({'error': 'Missing job_id or task_id'}), 400
@@ -370,13 +486,12 @@ def start_task():
                 return jsonify({'error': f"Task cannot be started. Status is currently '{task_record['Status']}'"}), 409
 
             # Set the start time and update the status
-            # time_started = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            parsed_time = datetime.strptime(time_started, '%Y-%m-%d %H:%M:%S')
+            time_started = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute("""
                 UPDATE job_card 
                 SET Status = 'In Progress', Time_Started = ?
                 WHERE Job_Id = ? AND Task_Id = ?
-            """, (parsed_time, job_id, task_id))
+            """, (time_started, job_id, task_id))
             conn.commit()
 
             return jsonify({'message': f'Task {task_id} started successfully'}), 200
@@ -423,14 +538,14 @@ def mark_task_complete():
                 INSERT INTO job_history (
                     Job_ID, Job_Name, Task_Id, Task_Description, Status, Date_Completed, Urgency, VIN, Make, Model, Mileage, 
                     Engineer_Id, Engineer_Name, Engineer_Level, Time_Started, Time_Ended, Time_Taken_Minutes, Estimated_Standard_Time, 
-                    Outcome_Score, Suitability_Score, Dynamic_Estimated_Time
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    Outcome_Score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 record['Job_Id'], record['Job_Name'], record['Task_Id'], record['Task_Description'], 'Completed',
                 time_ended_dt.strftime('%Y-%m-%d %H:%M:%S'), record['Urgency'], record['VIN'], record['Make'],
                 record['Model'], record['Mileage'], record['Engineer_Id'], record['Engineer_Name'],
                 record['Engineer_Level'], record['Time_Started'], time_ended_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                time_taken, record['Estimated_Standard_Time'], outcome_score, record['Suitability_Score'], record['Dynamic_Estimated_Time']
+                time_taken, record['Estimated_Standard_Time'], outcome_score
             ))
 
             # --- Delete from job_card ---
@@ -478,12 +593,9 @@ def get_job_history():
                 "time_taken": row[16],
                 "estimated_standard_time": row[17],
                 "outcome_score": row[18],
-                "dynamic_estimated_time": row[19],
-                "suitability_score": row[20]
             }
             for row in rows
         ]
-        
         return jsonify(job_history), 200
 
     except sqlite3.Error as e:
@@ -492,27 +604,6 @@ def get_job_history():
     finally:
         if conn:
             conn.close()
-
-@app.route("/reset-database", methods=["GET","POST"])
-def reset_database():
-    """
-    Resets the database by deleting all records from job_card and job_history.
-    This is a destructive operation, so it should be used with caution.
-    """
-    try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM job_card")
-            cursor.execute("UPDATE engineer_profiles SET Availability = 'Yes'")
-            cursor.execute("""
-                DELETE FROM job_history
-                WHERE CAST(SUBSTR(Job_ID, 4) AS INTEGER) < 1001
-            """)
-            conn.commit()
-        return jsonify({"message": "Database reset successfully"}), 200
-    except sqlite3.Error as e:
-        return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     app.run(debug=True,  use_reloader=False, threaded=False)

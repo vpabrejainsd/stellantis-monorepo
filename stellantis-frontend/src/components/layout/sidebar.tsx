@@ -53,16 +53,15 @@ export default function AppSidebar({ userRole }: AppSidebarProps) {
     // Use conditional classes to change the width based on the state.
     <Sidebar
       variant="inset"
-      // CHANGED: Hide on mobile (under md), show as flex column on md and up.
-      // The width transition logic now only applies to md+ screens.
       className={cn(
-        "hidden border-r transition-all duration-300 ease-in-out md:flex",
+        "border-r transition-all duration-300 ease-in-out",
         open ? "w-64" : "w-20",
       )}
     >
       <SidebarHeader>
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <Wrench className="h-6 w-6 shrink-0" />
+          {/* Conditionally render the brand name */}
           {open && <span className="text-lg">Stellantis Garage</span>}
         </Link>
       </SidebarHeader>
@@ -79,6 +78,7 @@ export default function AppSidebar({ userRole }: AppSidebarProps) {
               >
                 <Link href={item.href}>
                   <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                  {/* Conditionally render the label */}
                   {open && <span>{item.label}</span>}
                 </Link>
               </SidebarMenuButton>
