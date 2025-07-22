@@ -203,7 +203,7 @@ def get_timeline_data():
         print(f"Error fetching timeline data for date {date_str}: {e}")
         return jsonify({'error': 'An internal server error occurred'}), 500
 
-@app.route("/create-job", methods=["POST"])
+@app.route("/api/v1/create-job", methods=["POST"])
 def create_job_endpoint():
     data = request.get_json()
 
@@ -301,7 +301,7 @@ def create_job_endpoint():
 #         if conn:
 #             conn.close()
 
-@app.route("/jobs", methods=["GET"])
+@app.route("/api/v1/jobs", methods=["GET"])
 def get_jobs():
     jobs_df = fetch_all_jobs()
     jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0.0)
@@ -330,13 +330,13 @@ def select_serv():
     services = get_matching_services(user_input)
     return jsonify({"services": services})
 
-@app.route("/jobs/unassigned", methods=["GET"])
+@app.route("/api/v1/jobs/unassigned", methods=["GET"])
 def get_unassigned_jobs():
     jobs_df = fetch_unassigned_jobs()
     jobs = jobs_df.to_dict(orient="records")
     return jsonify(jobs)
 
-@app.route("/engineers/available", methods=["GET"])
+@app.route("/api/v1/engineers/available", methods=["GET"])
 def get_available_engineers():
     eng_df = fetch_available_engineers()
     engineers = eng_df.to_dict(orient="records")
@@ -344,7 +344,7 @@ def get_available_engineers():
 
 # In app.py
 
-@app.route("/jobs/assign-all-tasks", methods=["POST"]) # Changed route name for clarity
+@app.route("/api/v1/jobs/assign-all-tasks", methods=["POST"]) # Changed route name for clarity
 def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
     data = request.get_json()
     job_card_id = data.get("job_card_id")
@@ -439,7 +439,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
 #     ), 200
 
 
-@app.route("/jobs/complete", methods=["POST"])
+@app.route("/api/v1/jobs/complete", methods=["POST"])
 def complete_job_endpoint():
     data = request.get_json()
     job_card_id = data.get("job_card_id")
@@ -565,7 +565,7 @@ def mark_task_complete():
             return jsonify({'error': str(e)}), 500
 
 
-@app.route("/job-history", methods=["GET"])
+@app.route("/api/v1/job-history", methods=["GET"])
 def get_job_history():
     try:
         conn = get_connection()
