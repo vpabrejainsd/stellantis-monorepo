@@ -34,7 +34,7 @@ DB_PATH = "database/workshop.db"
 #     return sqlite3.connect(DB_PATH, timeout=10)
 
 
-@app.route('/engineers', methods=['GET'])
+@app.route('/api/v1/engineers', methods=['GET'])
 def get_all_engineers():
     """
     Fetches all engineer profiles from the database and returns them as JSON.
@@ -61,7 +61,7 @@ def get_all_engineers():
         print(f"Error fetching engineers: {e}") # Log the error for debugging
         return jsonify({'error': 'An internal server error occurred'}), 500
 
-@app.route('/engineers/<string:engineer_id>', methods=['GET'])
+@app.route('/api/v1/engineers/<string:engineer_id>', methods=['GET'])
 def get_engineer_profile(engineer_id):
     """
     Fetches the profile data for a single engineer.
@@ -82,7 +82,7 @@ def get_engineer_profile(engineer_id):
         print(f"Error fetching engineer profile {engineer_id}: {e}")
         return jsonify({'error': 'An internal server error occurred'}), 500
 
-@app.route('/engineers/<string:engineer_id>/details', methods=['GET'])
+@app.route('/api/v1/engineers/<string:engineer_id>/details', methods=['GET'])
 def get_engineer_details(engineer_id):
     """
     Fetches all details for a specific engineer, including their full profile
@@ -164,7 +164,7 @@ def get_engineer_details(engineer_id):
         print(f"Error fetching details for engineer {engineer_id}: {e}")
         return jsonify({'error': 'An internal server error occurred'}), 500
 
-@app.route('/timeline', methods=['GET'])
+@app.route('/api/v1/timeline', methods=['GET'])
 def get_timeline_data():
     """
     Fetches all tasks that were active on a specific date.
@@ -319,7 +319,7 @@ def get_jobs():
             job["Dynamic_Estimate"] = "N/A"
     return jsonify(jobs)
 
-@app.route('/mapping-services', methods = ['POST'])
+@app.route('/api/v1/mapping-services', methods = ['POST'])
 def select_serv():
     data = request.get_json()
     user_input = data.get('description')
@@ -457,7 +457,7 @@ def complete_job_endpoint():
         {"message": f"Job {job_card_id} marked as completed with score {outcome_score}"}
     ), 200
 
-@app.route('/jobs/start-task', methods=['POST'])
+@app.route('/api/v1/jobs/start-task', methods=['POST'])
 def start_task():
     """
     Starts a task by updating its status to 'In Progress' and setting the start time.
@@ -500,7 +500,7 @@ def start_task():
             conn.rollback()
             return jsonify({'error': str(e)}), 500
 
-@app.route('/jobs/mark-complete', methods=['POST'])
+@app.route('/api/v1/jobs/mark-complete', methods=['POST'])
 def mark_task_complete():
     """
     Moves a completed task from the job_card table to the job_history table.
