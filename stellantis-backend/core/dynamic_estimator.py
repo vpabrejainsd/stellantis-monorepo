@@ -54,7 +54,7 @@ def get_dynamic_job_estimate(job_id):
         cursor.execute("""
             SELECT Task_ID, Engineer_Id
             FROM job_card 
-            WHERE Job_ID = ? AND Status = 'Assigned'
+            WHERE Job_ID = ? AND Status IN ('Assigned', 'In Progress')
         """, (job_id,))
         
         assigned_tasks = cursor.fetchall()

@@ -68,11 +68,7 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
     Accepts data from a UI/frontend and creates job card records in the database.
     Returns a tuple: (True, success_message) or (False, error_message).
     """
-    if job_name == 'Custom Service' and selected_tasks:
-        tasks_to_perform = selected_tasks
-        print(tasks_to_perform)
-    else:
-        tasks_to_perform = JOB_TO_TASKS_MAPPING.get(job_name, [])
+    tasks_to_perform = selected_tasks or JOB_TO_TASKS_MAPPING.get(job_name, [])
 
     if not tasks_to_perform:
         print(f"Error: No tasks found for job '{job_name}'.")

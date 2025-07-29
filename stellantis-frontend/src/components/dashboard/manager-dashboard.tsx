@@ -24,9 +24,11 @@ import {
   LineChart,
   Line,
   CartesianGrid,
+  Legend, // ADDED: Legend for Pie Chart
 } from "recharts";
-import { format, subDays, parseISO } from "date-fns";
+import { format, subDays, parseISO, isToday } from "date-fns"; // ADDED: isToday
 import type { EngineerProfile, JobTask, JobHistoryTask } from "@/lib/types";
+import { ActiveTasksTable } from "./active-tasks-table";
 
 // --- PRIMARY COLOR ---
 const PRIMARY = "hsl(227, 57%, 33%)";
@@ -42,12 +44,18 @@ function KPI({
   color?: string;
 }) {
   return (
-    <Card className="min-w-[130px] flex-1">
+    // CHANGED: Responsive min-width for better stacking on small screens.
+    <Card className="min-w-0 flex-1">
       <CardContent className="flex flex-col items-center py-4">
-        <div className="text-2xl font-bold" style={color ? { color } : {}}>
+        {/* CHANGED: Responsive font size for value. */}
+        <div
+          className="text-xl font-bold sm:text-2xl"
+          style={color ? { color } : {}}
+        >
           {value}
         </div>
-        <div className="text-muted-foreground text-xs">{label}</div>
+        {/* CHANGED: Smaller text for label. */}
+        <div className="text-muted-foreground text-center text-xs">{label}</div>
       </CardContent>
     </Card>
   );
@@ -60,117 +68,118 @@ function useDashboardData() {
     totalEngineers: number;
     totalTasks: number;
     tasksInProgress: number;
-    tasksPending: number;
+    tasksAssigned: number;
     tasksCompletedToday: number;
-    avgOutcomeScore: string;
+    avgOutcomeScoreToday: string;
     tasksPerStatus: { status: string; count: number }[];
-    tasksPerType: { type: string; value: number }[];
-    tasksPerDay: { date: string; completed: number }[];
-    topEngineers: { name: string; count: number }[];
+    tasksPerTypeToday: { type: string; value: number }[];
+    tasksCompletedLast7Days: { date: string; completed: number }[];
+    activeTasksList: JobTask[];
   }>(null);
 
   React.useEffect(() => {
     async function fetchData() {
-      // Fetch and type the data
-      const engineers: EngineerProfile[] = await fetch(
-        `${process.env.NEXT_PUBLIC_FLASK_API_URL}/engineers`,
-      ).then((r) => r.json());
-      const jobs: JobTask[] = await fetch(
-        `${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs`,
-      ).then((r) => r.json());
-      const jobHistory: JobHistoryTask[] = await fetch(
-        `${process.env.NEXT_PUBLIC_FLASK_API_URL}/job-history`,
-      ).then((r) => r.json());
+      try {
+        const [engineersRes, jobsRes, jobHistoryRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/engineers`),
+          fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs`),
+          fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/job-history`),
+        ]);
 
-      // --- Compute KPIs ---
-      const totalEngineers = engineers.length;
-      const allTasks = [
-        ...jobs.map((t) => ({ ...t, Status: t.Status })),
-        ...jobHistory.map((t) => ({
-          ...t,
-          Status: "Completed" as const,
-          Task_Description: t.task_description,
-          Outcome_Score: t.outcome_score,
-        })),
-      ];
-      const totalTasks = allTasks.length;
-      const tasksInProgress = allTasks.filter(
-        (t) => t.Status === "In Progress",
-      ).length;
-      const tasksPending = allTasks.filter(
-        (t) => t.Status === "Pending",
-      ).length;
+        const engineers: EngineerProfile[] = await engineersRes.json();
+        const jobs: JobTask[] = await jobsRes.json();
+        const jobHistory: JobHistoryTask[] = await jobHistoryRes.json();
 
-      const todayStr = format(new Date(), "yyyy-MM-dd");
-      const tasksCompletedToday = jobHistory.filter(
-        (t) => t.date_completed?.slice(0, 10) === todayStr,
-      ).length;
-      const outcomeScores = jobHistory
-        .map((t) => t.outcome_score)
-        .filter((n): n is number => typeof n === "number");
-      const avgOutcomeScore = outcomeScores.length
-        ? (
-            outcomeScores.reduce((a, b) => a + b, 0) / outcomeScores.length
-          ).toFixed(2)
-        : "N/A";
+        // --- Compute KPIs ---
+        const totalEngineers = engineers.length;
+        const activeTasks = jobs.filter(
+          (t) => (t.Status as string) !== "Completed",
+        );
+        const totalTasks = activeTasks.length;
+        const tasksInProgress = activeTasks.filter(
+          (t) => t.Status === "In Progress",
+        ).length;
+        const tasksAssigned = activeTasks.filter(
+          (t) => t.Status === "Assigned",
+        ).length;
 
-      // --- Chart Data ---
-      // Tasks per Status
-      const statuses = ["Pending", "Assigned", "In Progress", "Completed"];
-      const tasksPerStatus = statuses.map((status) => ({
-        status,
-        count: allTasks.filter((t) => t.Status === status).length,
-      }));
+        const today = new Date();
+        const tasksCompletedToday = jobHistory.filter(
+          (t) => t.date_completed && isToday(parseISO(t.date_completed)),
+        ).length;
 
-      // Tasks per Type (Pie)
-      const taskTypeMap: Record<string, number> = {};
-      allTasks.forEach((t) => {
-        const desc = t.Task_Description;
-        if (!desc) return;
-        taskTypeMap[desc] = (taskTypeMap[desc] ?? 0) + 1;
-      });
-      const tasksPerType = Object.entries(taskTypeMap)
-        .map(([type, value]) => ({ type, value }))
-        .sort((a, b) => b.value - a.value);
+        const outcomeScoresToday = jobHistory
+          .filter(
+            (t) => t.date_completed && isToday(parseISO(t.date_completed)),
+          )
+          .map((t) => t.outcome_score)
+          .filter((n): n is number => typeof n === "number");
+        const avgOutcomeScoreToday = outcomeScoresToday.length
+          ? (
+              outcomeScoresToday.reduce((a, b) => a + b, 0) /
+              outcomeScoresToday.length
+            ).toFixed(2)
+          : "N/A";
 
-      // Tasks Completed per Day (Line)
-      const last30Days = Array.from({ length: 30 }).map((_, i) =>
-        format(subDays(new Date(), 29 - i), "yyyy-MM-dd"),
-      );
-      const tasksPerDay = last30Days.map((date) => ({
-        date: format(parseISO(date), "MMM d"),
-        completed: jobHistory.filter(
-          (t) => t.date_completed?.slice(0, 10) === date,
-        ).length,
-      }));
+        // --- Chart Data ---
+        const currentStatuses = ["Pending", "Assigned", "In Progress"];
+        const tasksPerStatus = currentStatuses.map((status) => ({
+          status,
+          count: activeTasks.filter((t) => t.Status === status).length,
+        }));
+        tasksPerStatus.push({
+          status: "Completed Today",
+          count: tasksCompletedToday,
+        });
 
-      // Top Engineers (Horizontal Bar)
-      const engineerTaskCount: Record<string, number> = {};
-      jobHistory.forEach((t) => {
-        if (!t.engineer_name) return;
-        engineerTaskCount[t.engineer_name] =
-          (engineerTaskCount[t.engineer_name] ?? 0) + 1;
-      });
-      const topEngineers = Object.entries(engineerTaskCount)
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-      setData({
-        totalEngineers,
-        totalTasks,
-        tasksInProgress,
-        tasksPending,
-        tasksCompletedToday,
-        avgOutcomeScore,
-        tasksPerStatus,
-        tasksPerType,
-        tasksPerDay,
-        topEngineers,
-      });
-      setLoading(false);
+        const taskTypeMapToday: Record<string, number> = {};
+        jobHistory
+          .filter(
+            (t) => t.date_completed && isToday(parseISO(t.date_completed)),
+          )
+          .forEach((t) => {
+            const desc = t.task_description;
+            if (!desc) return;
+            taskTypeMapToday[desc] = (taskTypeMapToday[desc] ?? 0) + 1;
+          });
+        const tasksPerTypeToday = Object.entries(taskTypeMapToday)
+          .map(([type, value]) => ({ type, value }))
+          .sort((a, b) => b.value - a.value);
+
+        const last7Days = Array.from({ length: 7 }).map((_, i) =>
+          format(subDays(today, 6 - i), "yyyy-MM-dd"),
+        );
+        const tasksCompletedLast7Days = last7Days.map((date) => ({
+          date: format(parseISO(date), "MMM d"),
+          completed: jobHistory.filter(
+            (t) => t.date_completed?.slice(0, 10) === date,
+          ).length,
+        }));
+
+        const activeTasksList = jobs.filter(
+          (task) => task.Status === "Assigned" || task.Status === "In Progress",
+        );
+
+        setData({
+          totalEngineers,
+          totalTasks,
+          tasksInProgress,
+          tasksAssigned,
+          tasksCompletedToday,
+          avgOutcomeScoreToday,
+          tasksPerStatus,
+          tasksPerTypeToday,
+          tasksCompletedLast7Days,
+          activeTasksList,
+        });
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+        setLoading(false);
+      }
     }
     void fetchData();
-  }, []);
+  }, []); // Empty dependency array means this runs once on component mount
   return { loading, data };
 }
 
@@ -179,7 +188,7 @@ const STATUS_COLORS: Record<string, string> = {
   Pending: "#eab308",
   Assigned: "#3b82f6",
   "In Progress": "#06b6d4",
-  Completed: "#22c55e",
+  "Completed Today": "#22c55e", // Changed to reflect daily context
 };
 const TASK_TYPE_COLORS = [
   "hsl(227, 57%, 33%)",
@@ -188,6 +197,9 @@ const TASK_TYPE_COLORS = [
   "#a21caf",
   "#6366f1",
   "#f97316",
+  "#ef4444", // More colors for variety
+  "#8b5cf6",
+  "#14b8a6",
 ];
 
 export default function DashboardPage() {
@@ -195,97 +207,149 @@ export default function DashboardPage() {
 
   if (loading || !data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-2 sm:p-6">
         <Skeleton className="h-24 w-full" />
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
         </div>
         <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    // ADDED: Responsive padding for the main container.
+    <div className="space-y-8 p-2 sm:p-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Manager Dashboard</h1>
+        {/* CHANGED: Responsive font size for main heading. */}
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Manager Dashboard
+        </h1>
         <p className="text-muted-foreground">
-          Overview of shop activity, engineer performance, and task flow.
+          Overview of shop activity, engineer performance, and task flow for
+          today.
         </p>
       </div>
 
       {/* --- KPI WIDGETS --- */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
+      {/* CHANGED: Responsive grid for KPIs. Stacks more on smaller screens. */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         <KPI
           label="Total Engineers"
           value={data.totalEngineers}
           color="#6366f1"
         />
-        <KPI label="Total Tasks" value={data.totalTasks} color={PRIMARY} />
+        {/* Renamed "Total Tasks" to "Total Active Tasks" for clarity */}
+        <KPI label="Active Tasks" value={data.totalTasks} color={PRIMARY} />
         <KPI label="In Progress" value={data.tasksInProgress} color="#06b6d4" />
-        <KPI
-          label="Pending Assignment"
-          value={data.tasksPending}
-          color="#eab308"
-        />
+        {/* ADDED: KPI for Tasks Assigned */}
+        <KPI label="Assigned" value={data.tasksAssigned} color="#3b82f6" />
         <KPI
           label="Completed Today"
           value={data.tasksCompletedToday}
           color="#22c55e"
         />
+        {/* CHANGED: KPI for Avg. Outcome Score Today */}
         <KPI
-          label="Avg. Outcome Score"
-          value={data.avgOutcomeScore}
+          label="Avg. Outcome Today"
+          value={data.avgOutcomeScoreToday}
           color="#a21caf"
         />
       </div>
 
       {/* --- CHARTS --- */}
-      <div className="">
-        {/* Task Type Distribution (Pie Chart) */}
+      {/* ADDED: Grid container for the first two charts to sit side-by-side on larger screens. */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Task Status Distribution (Bar Chart for current statuses) */}
         <Card>
           <CardHeader>
-            <CardTitle>Task Type Distribution</CardTitle>
+            <CardTitle>Current Task Status</CardTitle>
+            <CardDescription>
+              Breakdown of active task statuses and tasks completed today.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={data.tasksPerType}
-                  dataKey="value"
-                  nameKey="type"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  label
-                >
-                  {data.tasksPerType.map((entry, idx) => (
+              <BarChart data={data.tasksPerStatus}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="status" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill={PRIMARY}>
+                  {data.tasksPerStatus.map((entry, index) => (
                     <Cell
-                      key={entry.type}
-                      fill={TASK_TYPE_COLORS[idx % TASK_TYPE_COLORS.length]}
+                      key={`cell-${index}`}
+                      fill={STATUS_COLORS[entry.status]}
                     />
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Task Type Distribution Today (Pie Chart) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Task Types Completed Today</CardTitle>
+            <CardDescription>
+              Distribution of task types finished this day.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.tasksPerTypeToday.length > 0 ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={data.tasksPerTypeToday}
+                    dataKey="value"
+                    nameKey="type"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    labelLine={false} // Hide label lines for cleaner look
+                    label={({ name, percent }) =>
+                      `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`
+                    }
+                  >
+                    {data.tasksPerTypeToday.map((entry, idx) => (
+                      <Cell
+                        key={entry.type}
+                        fill={TASK_TYPE_COLORS[idx % TASK_TYPE_COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend /> {/* ADDED: Legend for Pie Chart */}
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-muted-foreground flex h-full items-center justify-center">
+                No tasks completed today to show distribution.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Tasks Completed Over Time (Line Chart) */}
+      {/* Tasks Completed Over Last 7 Days (Line Chart) */}
       <Card>
         <CardHeader>
-          <CardTitle>Tasks Completed per Day</CardTitle>
+          <CardTitle>Tasks Completed Last 7 Days</CardTitle>
+          <CardDescription>Daily count of tasks completed.</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={data.tasksPerDay}>
+            <LineChart data={data.tasksCompletedLast7Days}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" minTickGap={8} />
+              <XAxis dataKey="date" minTickGap={1} />
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Line
@@ -298,21 +362,16 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-
-      {/* Top Engineers (Horizontal Bar Chart) */}
       <Card>
         <CardHeader>
-          <CardTitle>Top Engineers by Tasks Completed</CardTitle>
+          <CardTitle>Active Tasks</CardTitle>
+          <CardDescription>
+            A real-time list of tasks that are currently assigned or in
+            progress.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={data.topEngineers} layout="vertical">
-              <XAxis type="number" allowDecimals={false} />
-              <YAxis dataKey="name" type="category" width={120} />
-              <Tooltip />
-              <Bar dataKey="count" fill={PRIMARY} />
-            </BarChart>
-          </ResponsiveContainer>
+          <ActiveTasksTable tasks={data.activeTasksList} />
         </CardContent>
       </Card>
     </div>
