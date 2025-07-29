@@ -132,25 +132,15 @@ export function NewJobForm() {
         setValue("selectedTasks", mergedTasks, { shouldValidate: true });
         setAiSuggestedTasks(aiSuggestedNames); // Keep track of just AI suggested for messaging
 
-        // Determine if the job type needs to change to "Custom Service"
         const currentPresetTasks = jobTypeToTaskNames[watchedJobType] || [];
         const hasNewTasksBeyondPreset = aiSuggestedNames.some(
-          (taskName: string) => !currentPresetTasks.includes(taskName),
+          (taskName) => !currentPresetTasks.includes(taskName),
         );
-        console.log(
-          selectedJobType,
-          watchedJobType,
-          hasNewTasksBeyondPreset,
-          form.getValues("selectedTasks"),
-        );
+      
         if (hasNewTasksBeyondPreset) {
-          setValue("jobType", "Custom Service");
-          setSelectedJobType("Custom Service"); // Update local state for rendering headers
-          toast.success(
-            "Tasks mapped and merged. Job type set to Custom Service.",
-          );
+          toast.success("Additional tasks have been mapped and added.");
         } else {
-          toast.success("Tasks mapped and merged with existing preset.");
+          toast.success("Tasks mapped and merged with your preset.");
         }
       } else {
         toast.error("No tasks returned from mapping.");
