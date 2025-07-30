@@ -9,7 +9,6 @@ import {
   Wrench,
   Package,
   type LucideIcon,
-  CalendarClock,
 } from "lucide-react";
 
 import {
@@ -19,7 +18,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter,
   useSidebar, // Import useSidebar hook
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -37,32 +35,29 @@ const managerNavItems: NavItem[] = [
   { href: "/dashboard/engineers", label: "Engineers", icon: Wrench },
 ];
 
-interface AppSidebarProps {
-  userRole: string;
-}
-
-export default function AppSidebar({ userRole }: AppSidebarProps) {
+export default function AppSidebar() {
   const pathname = usePathname();
   const navItems = managerNavItems;
 
   // Consume the state from the provider
-  const { open, toggleSidebar } = useSidebar();
+  const { open } = useSidebar();
 
   return (
     // Remove variant="floating". The sidebar is now part of the document flow.
     // Use conditional classes to change the width based on the state.
     <Sidebar
       variant="inset"
+      // CHANGED: Hide on mobile (under md), show as flex column on md and up.
+      // The width transition logic now only applies to md+ screens.
       className={cn(
-        "border-r transition-all duration-300 ease-in-out",
+        "hidden border-r transition-all duration-300 ease-in-out md:flex",
         open ? "w-64" : "w-20",
       )}
     >
       <SidebarHeader>
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <Wrench className="h-6 w-6 shrink-0" />
-          {/* Conditionally render the brand name */}
-          {open && <span className="text-lg">Stellantis Garage</span>}
+          <span className="text-lg">Stellantis Garage</span>
         </Link>
       </SidebarHeader>
 
@@ -78,8 +73,7 @@ export default function AppSidebar({ userRole }: AppSidebarProps) {
               >
                 <Link href={item.href}>
                   <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                  {/* Conditionally render the label */}
-                  {open && <span>{item.label}</span>}
+                  <span>{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
