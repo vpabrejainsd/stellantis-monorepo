@@ -22,7 +22,7 @@ import {
   parseISO,
   startOfDay,
 } from "date-fns";
-import { ChevronDown, MoreHorizontal, Star } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Star, User } from "lucide-react";
 import * as React from "react";
 import { type DateRange } from "react-day-picker";
 
@@ -73,6 +73,7 @@ import {
 import { useEffect } from "react";
 import { ProgressBar } from "./progress-bar";
 import { randomInt } from "node:crypto";
+import Link from "next/link";
 
 const formatMinutes = (mins: number): string => {
   const h = Math.floor(mins / 60);
@@ -249,6 +250,7 @@ function MarkCompleteDialog({ task, onTaskComplete }: MarkCompleteDialogProps) {
       success: async (res) => {
         if (!res.ok) {
           const error = (await res.json()) as { error: string };
+          console.error("Error marking task as complete:", error);
           throw new Error(error.error || "Failed to mark as complete.");
         }
         onTaskComplete(); // Refresh the table data
@@ -396,11 +398,13 @@ function TaskDetailsSubComponent({
               // ... (logic for colors and estimates remains the same) ...
               const standardTime = task.Estimated_Standard_Time;
               const dynamicEstimate =
-                task.Estimate_Details?.Tasks.find(
-                  (t) =>
-                    t.task_id === task.Task_Id &&
-                    t.engineer_id === task.Engineer_Id,
-                )?.estimate ?? 0;
+                task.Status !== "Completed"
+                  ? (task.Estimate_Details?.Tasks.find(
+                      (t) =>
+                        t.task_id === task.Task_Id &&
+                        t.engineer_id === task.Engineer_Id,
+                    )?.estimate ?? 0)
+                  : (task.Dynamic_Estimate ?? 0);
               const shownEstimate = Math.round(
                 Math.round((dynamicEstimate / 2) * 180) / 100,
               );
@@ -441,11 +445,29 @@ function TaskDetailsSubComponent({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div>{task.Engineer_Name ?? "N/A"}</div>
-                    {task.Engineer_Level && (
-                      <div className="text-muted-foreground text-xs">
-                        {task.Engineer_Level}
-                      </div>
+                    {task.Engineer_Id ? (
+                      <Link
+                        href={`/dashboard/engineers/${task.Engineer_Id}`}
+                        className="group flex max-w-[180px] items-center gap-2 text-blue-800 transition-colors hover:text-blue-600 hover:underline sm:max-w-none dark:text-blue-300"
+                        tabIndex={0}
+                      >
+                        <span className="inline-flex items-center gap-1 truncate">
+                          <User
+                            className="h-4 w-4 text-blue-400 transition-colors group-hover:text-blue-600"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">
+                            {task.Engineer_Name ?? "N/A"}
+                          </span>
+                        </span>
+                        {task.Engineer_Level && (
+                          <span className="text-muted-foreground bg-muted ml-1 hidden rounded px-2 py-0.5 text-xs group-hover:bg-blue-50 md:block dark:group-hover:bg-blue-950">
+                            {task.Engineer_Level}
+                          </span>
+                        )}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">N/A</span>
                     )}
                   </TableCell>
                   {/* CHANGED: Hide less critical columns on small screens */}
@@ -608,7 +630,7 @@ export function JobsDataTable() {
       // console.log("jobs: ", await jobsResponse.json());
       const currentTasks = (await jobsResponse.json()) as JobTask[];
       const historyTasks = (await historyResponse.json()) as JobHistoryTask[];
-      console.log("Current Tasks:", currentTasks);
+
       const normalizedCurrentTasks: UnifiedTask[] = currentTasks.map(
         (task) => ({
           ...task,
@@ -630,7 +652,7 @@ export function JobsDataTable() {
           Engineer_Name: task.engineer_name,
           Engineer_Level: task.engineer_level,
           Estimated_Standard_Time: task.estimated_standard_time,
-          Suitability_Score: null,
+          Suitability_Score: task.suitability_score ?? null,
           timeTaken: task.time_taken,
           VIN: task.VIN,
           Make: task.make,
@@ -638,6 +660,7 @@ export function JobsDataTable() {
           Job_Name: task.job_name,
           Date_Created: task.time_started,
           Urgency: task.urgency,
+          Dynamic_Estimate: task.dynamic_estimated_time,
         }),
       );
       const allTasks = [...normalizedCurrentTasks, ...normalizedHistoryTasks];

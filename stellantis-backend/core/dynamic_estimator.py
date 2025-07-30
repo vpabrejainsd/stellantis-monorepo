@@ -5,44 +5,50 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, 'database/workshop.db')
 
-def get_dynamic_task_estimate(task_id, engineer_id, conn):
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT AVG(Time_Taken_minutes) 
-        FROM job_history 
-        WHERE Engineer_Id = ? AND Task_ID = ?
-    """, (engineer_id, task_id))
-    
-    result = cursor.fetchone()
-    engineer_avg_time = result[0] if result and result[0] is not None else None
-    
-    cursor.execute("SELECT Estimated_Standard_Time FROM job_card WHERE Task_Id = ?", (task_id,))
-    task_def_result = cursor.fetchone()
-    standard_estimate = task_def_result[0] if task_def_result else 60 # Default to 60 if not found
+def get_dynamic_task_estimate(task_id, engineer_id, conn=None):
+    created_connection = False
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        created_connection = True
 
-    cursor.execute("SELECT Years_of_Experience FROM engineer_profiles WHERE engineer_id = ?", (engineer_id,))
-    eng_profile_result = cursor.fetchone()
-    experience_level = eng_profile_result[0] if eng_profile_result else 'Junior' # Default to Junior
-
-    final_estimate = 0
-    if engineer_avg_time is None:
-        # If no history, rely 100% on the standard estimate
-        print(f"  - Task {task_id} (Eng: {engineer_id}, Level: {experience_level}): No history. Using standard time.")
-        final_estimate = standard_estimate
-    else:
-        # Apply weights based on experience level
-        if experience_level == 'Master':
-            weight = 0.7
-        elif experience_level == 'Senior':
-            weight = 0.5
-        else: # Junior
-            weight = 0.3
+    try:
+        cursor = conn.cursor()
         
-        final_estimate = (engineer_avg_time * weight) + (standard_estimate * (1 - weight))
-        print(f"  - Task {task_id} (Eng: {engineer_id}, Level: {experience_level}): Blending personal avg ({engineer_avg_time:.0f}) and standard time ({standard_estimate}) with {weight*100:.0f}% weight.")
+        cursor.execute("""
+            SELECT AVG(Time_Taken_minutes) 
+            FROM job_history 
+            WHERE Engineer_Id = ? AND Task_ID = ?
+        """, (engineer_id, task_id))
+        result = cursor.fetchone()
+        engineer_avg_time = result[0] if result and result[0] is not None else None
 
-    return True, round(final_estimate)
+        cursor.execute("SELECT Estimated_Standard_Time FROM job_card WHERE Task_Id = ?", (task_id,))
+        task_def_result = cursor.fetchone()
+        standard_estimate = task_def_result[0] if task_def_result else 60
+
+        cursor.execute("SELECT Years_of_Experience FROM engineer_profiles WHERE engineer_id = ?", (engineer_id,))
+        eng_profile_result = cursor.fetchone()
+        experience_level = eng_profile_result[0] if eng_profile_result else 'Junior'
+
+        if engineer_avg_time is None:
+            print(f"  - Task {task_id} (Eng: {engineer_id}, Level: {experience_level}): No history. Using standard time.")
+            final_estimate = standard_estimate
+        else:
+            if experience_level == 'Master':
+                weight = 0.7
+            elif experience_level == 'Senior':
+                weight = 0.5
+            else:
+                weight = 0.3
+            final_estimate = (engineer_avg_time * weight) + (standard_estimate * (1 - weight))
+            print(f"  - Task {task_id} (Eng: {engineer_id}, Level: {experience_level}): Blending personal avg ({engineer_avg_time:.0f}) and standard time ({standard_estimate}) with {weight*100:.0f}% weight.")
+        
+        return True, round(final_estimate)
+
+    finally:
+        if created_connection:
+            conn.close()
 
 def get_dynamic_job_estimate(job_id):
     conn = None

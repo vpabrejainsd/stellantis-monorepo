@@ -82,10 +82,8 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
     for task_id in tasks_to_perform:
         print(task_id)
         task_info = TASKS_DATA.get(task_id)
-        print(task_info)
         if not task_info:
             continue
-            
         record = (
             # Use the newly generated JOB ID
             job_id_with_prefix, 
