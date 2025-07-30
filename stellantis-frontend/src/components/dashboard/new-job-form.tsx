@@ -132,13 +132,17 @@ export function NewJobForm() {
         setValue("selectedTasks", mergedTasks, { shouldValidate: true });
         setAiSuggestedTasks(aiSuggestedNames); // Keep track of just AI suggested for messaging
 
-        // Determine if the job type needs to change to "Custom Service"
         const currentPresetTasks = jobTypeToTaskNames[watchedJobType] || [];
         const hasNewTasksBeyondPreset = aiSuggestedNames.some(
           (taskName: string) => !currentPresetTasks.includes(taskName),
         );
         if (hasNewTasksBeyondPreset) {
           toast.success("Additional tasks have been added.");
+          (taskName) => !currentPresetTasks.includes(taskName),
+        );
+      
+        if (hasNewTasksBeyondPreset) {
+          toast.success("Additional tasks have been mapped and added.");
         } else {
           toast.success("Tasks mapped and merged with your preset.");
         }
