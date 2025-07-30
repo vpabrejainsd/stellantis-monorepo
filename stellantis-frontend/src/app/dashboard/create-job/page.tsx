@@ -2,9 +2,13 @@ import { NewJobForm } from "@/components/dashboard/new-job-form";
 
 export default function CreateJobPage() {
   return (
-    <div className="space-y-6">
+    // ADDED: Responsive padding to the page container
+    <div className="space-y-6 p-2 sm:p-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Create a New Job</h1>
+        {/* CHANGED: Responsive font size for the main heading */}
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Create a New Job
+        </h1>
         <p className="text-muted-foreground">
           Fill out the form below to register a new vehicle and create a service
           job in the system.
@@ -12,7 +16,8 @@ export default function CreateJobPage() {
       </div>
 
       {/* The Form Component */}
-      <div className="flex max-w-7xl items-center justify-center">
+      {/* This container is fine, it centers the form content within a max-width */}
+      <div className="flex w-full items-center justify-center">
         <NewJobForm />
       </div>
     </div>
