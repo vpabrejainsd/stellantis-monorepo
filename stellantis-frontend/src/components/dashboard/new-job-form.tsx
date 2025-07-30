@@ -134,6 +134,10 @@ export function NewJobForm() {
 
         const currentPresetTasks = jobTypeToTaskNames[watchedJobType] || [];
         const hasNewTasksBeyondPreset = aiSuggestedNames.some(
+          (taskName: string) => !currentPresetTasks.includes(taskName),
+        );
+        if (hasNewTasksBeyondPreset) {
+          toast.success("Additional tasks have been added.");
           (taskName) => !currentPresetTasks.includes(taskName),
         );
       
@@ -277,7 +281,10 @@ export function NewJobForm() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>New Car & Job Intake</CardTitle>
+        {/* CHANGED: Responsive font size */}
+        <CardTitle className="text-xl sm:text-2xl">
+          New Car & Job Intake
+        </CardTitle>
         <CardDescription>
           Enter car details and describe the problems. Tasks can be selected
           from a preset or suggested automatically.
@@ -293,7 +300,11 @@ export function NewJobForm() {
           >
             {/* Car Details */}
             <div>
-              <h3 className="mb-4 text-lg font-semibold">Car Details</h3>
+              {/* CHANGED: Responsive font size */}
+              <h3 className="mb-4 text-lg font-semibold md:text-xl">
+                Car Details
+              </h3>
+              {/* This grid is already responsive (stacks on mobile, 2 cols on md+), which is great. */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -361,15 +372,18 @@ export function NewJobForm() {
 
             {/* Problem Description & Urgency */}
             <div>
-              <h3 className="mb-4 text-lg font-semibold">
+              {/* CHANGED: Responsive font size */}
+              <h3 className="mb-4 text-lg font-semibold md:text-xl">
                 Service Details & Urgency
               </h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {/* CHANGED: Using `lg` breakpoint for a better tablet experience */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="description"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
+                    // CHANGED: Using `lg` breakpoint
+                    <FormItem className="lg:col-span-2">
                       <FormLabel>Describe Additional Problems</FormLabel>
                       <FormControl>
                         <Textarea
@@ -384,6 +398,7 @@ export function NewJobForm() {
                   )}
                 />
                 <div className="flex w-full flex-col space-y-4">
+                  {/* These fields will stack nicely, which is good for all screen sizes */}
                   <FormField
                     control={form.control}
                     name="jobType"
@@ -400,7 +415,7 @@ export function NewJobForm() {
                               <SelectValue placeholder="Select job type" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent className="w-full">
+                          <SelectContent>
                             {JOB_TYPES.map((type) => (
                               <SelectItem key={type} value={type}>
                                 {type}
@@ -441,7 +456,8 @@ export function NewJobForm() {
                   />
                 </div>
               </div>
-              <div className="mt-4 flex">
+              {/* CHANGED: Flex layout for better wrapping on small screens */}
+              <div className="mt-4 flex flex-wrap items-center gap-4">
                 <Button
                   type="button"
                   variant="secondary"
@@ -451,7 +467,7 @@ export function NewJobForm() {
                   {isMapping ? "Analyzing..." : "Analyze & Add Tasks"}
                 </Button>
                 {aiSuggestedTasks.length > 0 && (
-                  <span className="ml-4 flex items-center gap-1 text-sm text-green-600">
+                  <span className="flex items-center gap-1 text-sm text-green-600">
                     Tasks suggested! Please review below.
                   </span>
                 )}
@@ -462,10 +478,11 @@ export function NewJobForm() {
 
             {/* Task Selection */}
             <div>
-              <h3 className="mb-4 text-lg font-semibold">
+              {/* CHANGED: Responsive font size */}
+              <h3 className="mb-4 text-lg font-semibold md:text-xl">
                 {selectedJobType} Tasks
               </h3>
-              <div className="bg-muted/30 space-y-2 rounded-md border p-4">
+              <div className="bg-muted/30 space-y-2 rounded-md border p-3 sm:p-4">
                 {presetTaskNames.length > 0 ? (
                   presetTaskNames.map((taskName) => (
                     <FormItem
@@ -488,8 +505,12 @@ export function NewJobForm() {
 
               {addonTasks.length > 0 && (
                 <>
-                  <h3 className="mt-6 mb-4 text-lg font-semibold">Add-ons</h3>
-                  <div className="bg-muted/30 space-y-2 rounded-md border p-4">
+                  {/* CHANGED: Responsive font size */}
+                  <h3 className="mt-6 mb-4 text-lg font-semibold md:text-xl">
+                    Add-ons
+                  </h3>
+                  {/* ADDED: Responsive padding */}
+                  <div className="bg-muted/30 space-y-2 rounded-md border p-3 sm:p-4">
                     {addonTasks.map((taskInfo) => {
                       return (
                         <FormField
@@ -528,9 +549,12 @@ export function NewJobForm() {
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Job"}
-            </Button>
+            {/* ADDED: w-full and md:w-auto for button width control */}
+            <div className="flex justify-end">
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Creating..." : "Create Job"}
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>

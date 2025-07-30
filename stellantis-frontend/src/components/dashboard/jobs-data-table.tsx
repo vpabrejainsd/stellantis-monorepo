@@ -59,7 +59,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { cn, getLocalTimeString } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -103,132 +103,75 @@ interface DataTableToolbarProps {
 }
 
 function DataTableToolbar({ table }: DataTableToolbarProps) {
-  // const isFiltered =
-  //   table.getState().columnFilters.length > 0 ||
-  //   !!table.getState().globalFilter;
-  // const [date, setDate] = React.useState<DateRange | undefined>(undefined);
-
-  // React.useEffect(() => {
-  //   table.getColumn("Date_Created")?.setFilterValue(date);
-  // }, [date, table]);
-
-  // const resetFilters = () => {
-  //   table.resetColumnFilters();
-  //   table.setGlobalFilter("");
-  //   setDate(undefined);
-  // };
-
-  const COMPLETION_STATUSES = ["Not Started", "In Progress", "Completed"];
+  const COMPLETION_STATUSES = ["In Progress", "Completed"];
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex w-full items-center justify-between gap-2">
-        <Input
-          placeholder="Search by VIN or Car Name..."
-          value={(table.getState().globalFilter as string) ?? ""}
-          onChange={(event) => table.setGlobalFilter(event.target.value)}
-          className="h-10 w-full"
-        />
-        <Select
-          onValueChange={(value) =>
-            table
-              .getColumn("Job_Name")
-              ?.setFilterValue(value === "all" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="h-10 w-full">
-            <SelectValue placeholder="Filter by Service" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Services</SelectItem>
-            {JOB_TYPES.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(value) =>
-            table
-              .getColumn("Urgency")
-              ?.setFilterValue(value === "all" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="h-10 w-full">
-            <SelectValue placeholder="Filter by Urgency" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Urgencies</SelectItem>
-            {["Low", "Normal", "High"].map((level) => (
-              <SelectItem key={level} value={level}>
-                {level}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(value) =>
-            table
-              .getColumn("derivedCompletionStatus")
-              ?.setFilterValue(value === "all" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="h-10 w-full">
-            <SelectValue placeholder="Filter by Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {COMPLETION_STATUSES.map((status) => (
-              <SelectItem key={status} value={status}>
-                {status}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/* <Popover> */}
-        {/*   <PopoverTrigger asChild> */}
-        {/*     <Button */}
-        {/*       id="date" */}
-        {/*       variant={"outline"} */}
-        {/*       className="h-10 w-[300px] justify-start text-left font-normal" */}
-        {/*     > */}
-        {/*       <CalendarIcon className="mr-2 h-4 w-4" /> */}
-        {/*       {date?.from ? ( */}
-        {/*         date.to ? ( */}
-        {/*           <> */}
-        {/*             {format(date.from, "LLL dd, y")} -{" "} */}
-        {/*             {format(date.to, "LLL dd, y")} */}
-        {/*           </> */}
-        {/*         ) : ( */}
-        {/*           format(date.from, "LLL dd, y") */}
-        {/*         ) */}
-        {/*       ) : ( */}
-        {/*         <span>Pick a date range</span> */}
-        {/*       )} */}
-        {/*     </Button> */}
-        {/*   </PopoverTrigger> */}
-        {/*   <PopoverContent className="w-auto p-0" align="start"> */}
-        {/*     <Calendar */}
-        {/*       initialFocus */}
-        {/*       mode="range" */}
-        {/*       defaultMonth={date?.from} */}
-        {/*       selected={date} */}
-        {/*       onSelect={setDate} */}
-        {/*       numberOfMonths={2} */}
-        {/*     /> */}
-        {/*   </PopoverContent> */}
-        {/* </Popover> */}
-        {/* {isFiltered && ( */}
-        {/*   <Button */}
-        {/*     variant="ghost" */}
-        {/*     onClick={resetFilters} */}
-        {/*     className="h-10 px-2 lg:px-3" */}
-        {/*   > */}
-        {/*     Reset <X className="ml-2 h-4 w-4" /> */}
-        {/*   </Button> */}
-        {/* )} */}
-      </div>
+    // CHANGED: Replaced the rigid flex layout with a responsive grid.
+    // This stacks filters on mobile and expands to columns on larger screens.
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <Input
+        placeholder="Search by VIN or Car Name..."
+        value={(table.getState().globalFilter as string) ?? ""}
+        onChange={(event) => table.setGlobalFilter(event.target.value)}
+        className="h-10"
+      />
+      <Select
+        onValueChange={(value) =>
+          table
+            .getColumn("Job_Name")
+            ?.setFilterValue(value === "all" ? undefined : value)
+        }
+      >
+        <SelectTrigger className="h-10 w-full">
+          <SelectValue placeholder="Filter by Service" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Services</SelectItem>
+          {JOB_TYPES.map((type) => (
+            <SelectItem key={type} value={type}>
+              {type}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        onValueChange={(value) =>
+          table
+            .getColumn("Urgency")
+            ?.setFilterValue(value === "all" ? undefined : value)
+        }
+      >
+        <SelectTrigger className="h-10 w-full">
+          <SelectValue placeholder="Filter by Urgency" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Urgencies</SelectItem>
+          {["Low", "Normal", "High"].map((level) => (
+            <SelectItem key={level} value={level}>
+              {level}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        onValueChange={(value) =>
+          table
+            .getColumn("derivedCompletionStatus")
+            ?.setFilterValue(value === "all" ? undefined : value)
+        }
+      >
+        <SelectTrigger className="h-10 w-full">
+          <SelectValue placeholder="Filter by Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Statuses</SelectItem>
+          {COMPLETION_STATUSES.map((status) => (
+            <SelectItem key={status} value={status}>
+              {status}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -358,6 +301,8 @@ interface StartTaskActionProps {
 }
 function StartTaskAction({ task, onTaskStart }: StartTaskActionProps) {
   const handleStartTask = () => {
+    const timeStarted = getLocalTimeString();
+    console.log("Starting task:", task.Task_Id, "at", timeStarted);
     const promise = fetch(
       `${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs/start-task`,
       {
@@ -366,6 +311,7 @@ function StartTaskAction({ task, onTaskStart }: StartTaskActionProps) {
         body: JSON.stringify({
           job_id: task.Job_Id,
           task_id: task.Task_Id,
+          time_started: timeStarted,
         }),
       },
     );
@@ -414,150 +360,151 @@ function TaskDetailsSubComponent({
   }, [tasks]);
 
   return (
-    <div className="bg-muted/50 p-4">
+    <div className="bg-muted/50 p-2 sm:p-4">
       <div>
-        <div className="flex items-center justify-center gap-1">
+        <div className="flex items-center justify-center gap-2">
           <ProgressBar value={progress} key={tasks[0]?.Job_Id} />
-          <h1>{progress.toPrecision(3)}%</h1>
+          <span>{progress.toPrecision(3)}%</span>
         </div>
-        <h4 className="mb-2 font-semibold">Tasks for this Job:</h4>
+        {/* ADDED: Responsive font size */}
+        <h4 className="mb-2 text-base font-semibold sm:text-lg">
+          Tasks for this Job:
+        </h4>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Task</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Assigned Engineer</TableHead>
-            <TableHead>Suitability Score</TableHead>
-            <TableHead>Standard Est. Time</TableHead>
-            <TableHead>Dynamic Est.</TableHead>
-            <TableHead>Time Taken</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tasks.map((task) => {
-            // row background
-            const rowColor = getTaskRowColor(
-              task.Status,
-              task.timeTaken,
-              task.Estimated_Standard_Time,
-            );
-
-            // actions availability
-            const canStart = task.Status === "Assigned";
-            const canComplete = task.Status === "In Progress";
-
-            // compute standard vs dynamic & badge color
-            const standardTime = task.Estimated_Standard_Time;
-            const dynamicEstimate =
-              task.Estimate_Details?.Tasks.find(
-                (t) =>
-                  t.task_id === task.Task_Id &&
-                  t.engineer_id === task.Engineer_Id,
-              )?.estimate ?? 0;
-
-            const shownEstimate = Math.round(
-              Math.round((dynamicEstimate / 2) * 180) / 100,
-            );
-
-            const badgeClass =
-              shownEstimate > standardTime
-                ? "bg-red-500 dark:bg-red-700"
-                : shownEstimate === standardTime
-                  ? "bg-yellow-500 dark:bg-yellow-700"
-                  : "bg-green-500 dark:bg-green-700";
-
-            const suitability = task.Suitability_Score ?? 0;
-            const suitabilityBadgeClass =
-              suitability < 60
-                ? "bg-red-500 dark:bg-red-700"
-                : suitability <= 80
-                  ? "bg-yellow-500 dark:bg-yellow-700"
-                  : "bg-green-500 dark:bg-green-700";
-            return (
-              <TableRow key={task.Task_Id} className={rowColor}>
-                <TableCell className="font-medium">
-                  {task.Task_Description}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      task.Status === "Completed" ? "outline" : "default"
-                    }
-                  >
-                    {task.Status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div>{task.Engineer_Name ?? "N/A"}</div>
-                  {task.Engineer_Level && (
-                    <div className="text-muted-foreground text-xs">
-                      {task.Engineer_Level}
-                    </div>
+      {/* ADDED: Wrapper to make the inner table horizontally scrollable. */}
+      <div className="w-full overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Task</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Assigned Engineer</TableHead>
+              {/* CHANGED: Hide less critical columns on small screens */}
+              <TableHead className="hidden lg:table-cell">
+                Suitability Score
+              </TableHead>
+              <TableHead className="hidden md:table-cell">
+                Standard Est. Time
+              </TableHead>
+              <TableHead>Dynamic Est.</TableHead>
+              <TableHead className="hidden md:table-cell">Time Taken</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tasks.map((task) => {
+              // ... (logic for colors and estimates remains the same) ...
+              const standardTime = task.Estimated_Standard_Time;
+              const dynamicEstimate =
+                task.Estimate_Details?.Tasks.find(
+                  (t) =>
+                    t.task_id === task.Task_Id &&
+                    t.engineer_id === task.Engineer_Id,
+                )?.estimate ?? 0;
+              const shownEstimate = Math.round(
+                Math.round((dynamicEstimate / 2) * 180) / 100,
+              );
+              const badgeClass =
+                shownEstimate > standardTime
+                  ? "bg-red-500"
+                  : shownEstimate === standardTime
+                    ? "bg-yellow-500"
+                    : "bg-green-500";
+              const suitability = task.Suitability_Score ?? 0;
+              const suitabilityBadgeClass =
+                suitability < 60
+                  ? "bg-red-500"
+                  : suitability <= 80
+                    ? "bg-yellow-500"
+                    : "bg-green-500";
+              const canStart = task.Status === "Assigned";
+              const canComplete = task.Status === "In Progress";
+              return (
+                <TableRow
+                  key={task.Task_Id}
+                  className={getTaskRowColor(
+                    task.Status,
+                    task.timeTaken,
+                    task.Estimated_Standard_Time,
                   )}
-                </TableCell>
-                <TableCell>
-                  {task.Suitability_Score == null ? (
-                    "N/A"
-                  ) : (
+                >
+                  <TableCell className="font-medium">
+                    {task.Task_Description}
+                  </TableCell>
+                  <TableCell>
                     <Badge
-                      className={cn(
-                        "rounded-full px-2 py-1",
-                        suitabilityBadgeClass,
-                      )}
+                      variant={
+                        task.Status === "Completed" ? "outline" : "default"
+                      }
                     >
-                      {`${task.Suitability_Score}%`}
+                      {task.Status}
                     </Badge>
-                  )}
-                </TableCell>
-                {/* Standard estimate */}
-                <TableCell>{formatMinutes(standardTime)}</TableCell>
-
-                {/* Dynamic estimate with colored badge */}
-                <TableCell>
-                  <Badge className={cn("rounded-full px-2 py-1", badgeClass)}>
-                    {formatMinutes(shownEstimate)}
-                  </Badge>
-                </TableCell>
-
-                {/* Actual time taken */}
-                <TableCell>
-                  {task.timeTaken > 0 ? formatMinutes(task.timeTaken) : "-"}
-                </TableCell>
-
-                {/* Actions dropdown */}
-                <TableCell className="text-right">
-                  {task.Status !== "Completed" && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled>Edit</DropdownMenuItem>
-                        {canStart && (
-                          <StartTaskAction
-                            task={task}
-                            onTaskStart={onTaskUpdate}
-                          />
+                  </TableCell>
+                  <TableCell>
+                    <div>{task.Engineer_Name ?? "N/A"}</div>
+                    {task.Engineer_Level && (
+                      <div className="text-muted-foreground text-xs">
+                        {task.Engineer_Level}
+                      </div>
+                    )}
+                  </TableCell>
+                  {/* CHANGED: Hide less critical columns on small screens */}
+                  <TableCell className="hidden lg:table-cell">
+                    {task.Suitability_Score == null ? (
+                      "N/A"
+                    ) : (
+                      <Badge
+                        className={cn(
+                          "rounded-full px-2 py-1",
+                          suitabilityBadgeClass,
                         )}
-                        {canComplete && (
-                          <MarkCompleteDialog
-                            task={task}
-                            onTaskComplete={onTaskUpdate}
-                          />
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                      >{`${task.Suitability_Score}%`}</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {formatMinutes(standardTime)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={cn("rounded-full px-2 py-1", badgeClass)}>
+                      {formatMinutes(shownEstimate)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {task.timeTaken > 0 && task.Status === "Completed"
+                      ? formatMinutes(task.timeTaken)
+                      : "-"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {task.Status !== "Completed" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canStart && (
+                            <StartTaskAction
+                              task={task}
+                              onTaskStart={onTaskUpdate}
+                            />
+                          )}
+                          {canComplete && (
+                            <MarkCompleteDialog
+                              task={task}
+                              onTaskComplete={onTaskUpdate}
+                            />
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -637,30 +584,6 @@ const columns: ColumnDef<Job>[] = [
           )
         : row.original.Dynamic_Estimated_Time;
     },
-  },
-  {
-    id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="h-8 w-8 p-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-            View Details
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-    enableGlobalFilter: false,
-    enableSorting: false,
   },
 ];
 
@@ -801,17 +724,26 @@ export function JobsDataTable() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
-
+  const columnClassMap: Record<string, string> = {
+    Job_Id: "hidden lg:table-cell", // Hide Job ID on most screens
+    Urgency: "hidden sm:table-cell", // Hide Urgency on the smallest screens
+    Dynamic_Estimated_Time: "hidden md:table-cell", // Hide estimate on small/medium
+  };
   return (
     <div className="w-full space-y-4">
       <DataTableToolbar table={table} />
-      <div className="rounded-md border">
+      {/* ADDED: `overflow-x-auto` to allow the table to be scrolled horizontally on small screens. */}
+      <div className="w-full overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  // CHANGED: Apply responsive classes to hide certain columns.
+                  <TableHead
+                    key={header.id}
+                    className={cn(columnClassMap[header.id])}
+                  >
                     {flexRender(
                       header.column.columnDef.header,
                       header.getContext(),
@@ -832,45 +764,40 @@ export function JobsDataTable() {
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => {
-                const jobColor = getJobRowColor(
-                  row.original.derivedCompletionStatus,
-                );
-                return (
-                  <React.Fragment key={row.id}>
-                    <TableRow
-                      data-state={row.getIsExpanded() && "selected"}
-                      onClick={row.getToggleExpandedHandler()}
-                      className={`cursor-pointer ${jobColor}`}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow
-                      className={!row.getIsExpanded() ? "bg-transparent" : ""}
-                    >
+              table.getRowModel().rows.map((row) => (
+                <React.Fragment key={row.id}>
+                  <TableRow
+                    data-state={row.getIsExpanded() && "selected"}
+                    onClick={row.getToggleExpandedHandler()}
+                    className={`cursor-pointer ${getJobRowColor(row.original.derivedCompletionStatus)}`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      // CHANGED: Apply same responsive classes to the data cells.
+                      <TableCell
+                        key={cell.id}
+                        className={cn(columnClassMap[cell.column.id])}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {/* This is the expanded row content */}
+                  {row.getIsExpanded() && (
+                    <TableRow>
                       <TableCell colSpan={columns.length} className="p-0">
-                        <div
-                          className={`overflow-hidden transition-[max-height] duration-500 ease-in-out ${row.getIsExpanded() ? "max-h-[1000px]" : "max-h-0"}`}
-                        >
-                          <div className="p-4">
-                            <TaskDetailsSubComponent
-                              tasks={row.original.tasks}
-                              onTaskUpdate={fetchAndProcessData}
-                            />
-                          </div>
-                        </div>
+                        {/* CHANGED: Removed extra inner div with padding. Padding is now handled inside TaskDetailsSubComponent. */}
+                        <TaskDetailsSubComponent
+                          tasks={row.original.tasks}
+                          onTaskUpdate={fetchAndProcessData}
+                        />
                       </TableCell>
                     </TableRow>
-                  </React.Fragment>
-                );
-              })
+                  )}
+                </React.Fragment>
+              ))
             ) : (
               <TableRow>
                 <TableCell
@@ -884,14 +811,13 @@ export function JobsDataTable() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex w-full items-center justify-between">
-        <div className="flex items-center justify-between">
-          <h3 className="text-muted-foreground text-sm font-medium">
-            Displaying {table.getFilteredRowModel().rows.length} of{" "}
-            {data.length} total jobs.
-          </h3>
+      {/* CHANGED: Make pagination controls stack on mobile and go row on larger screens. */}
+      <div className="flex flex-col items-start justify-between gap-4 py-4 sm:flex-row sm:items-center">
+        <div className="text-muted-foreground flex-1 text-sm">
+          Displaying {table.getFilteredRowModel().rows.length} of {data.length}{" "}
+          total jobs.
         </div>
-        <div className="flex items-center space-x-2 py-4">
+        <div className="flex items-center space-x-2">
           <Button
             variant="outline"
             size="sm"

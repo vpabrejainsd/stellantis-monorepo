@@ -35,9 +35,11 @@ export default function AllEngineersPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-2 sm:p-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Engineer Roster</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          Engineer Roster
+        </h1>
         <p className="text-muted-foreground">
           Browse all service engineers in the system.
         </p>
@@ -45,8 +47,7 @@ export default function AllEngineersPage() {
 
       {isLoading && (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {/* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */}
-          {[...Array(8)].map((_, i) => (
+          {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-[250px] w-full" />
           ))}
         </div>
@@ -59,6 +60,7 @@ export default function AllEngineersPage() {
       )}
 
       {!isLoading && !error && (
+        // This responsive grid works perfectly for the engineer cards.
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {engineers.map((engineer) => (
             <EngineerCard key={engineer.Engineer_ID} engineer={engineer} />
