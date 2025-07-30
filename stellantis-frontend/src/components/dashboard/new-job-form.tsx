@@ -138,9 +138,8 @@ export function NewJobForm() {
         );
         if (hasNewTasksBeyondPreset) {
           toast.success("Additional tasks have been added.");
-          (taskName) => !currentPresetTasks.includes(taskName),
-        );
-      
+        }
+
         if (hasNewTasksBeyondPreset) {
           toast.success("Additional tasks have been mapped and added.");
         } else {
