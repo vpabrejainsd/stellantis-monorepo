@@ -149,7 +149,7 @@ export function NewJobForm() {
       } else {
         toast.error("No tasks returned from mapping.");
       }
-    } catch (e) {
+    } catch {
       toast.error("Could not map description to tasks.");
     } finally {
       setIsMapping(false);
@@ -232,14 +232,18 @@ export function NewJobForm() {
         message: string;
         assignments: {
           task_id: string;
-          status: string;
           engineer_assigned: string | null;
+          suitability_score: number | null;
+          status: string;
+          recommendation_reason: string | null;
+          dynamic_estimated_time: number | null;
         }[];
       };
 
       const successes = assignmentSummary.assignments.filter(
         (a) => a.status === "Assigned",
       ).length;
+      console.log(successes, assignmentSummary.assignments);
       const failures = assignmentSummary.assignments.length - successes;
 
       if (failures === 0) {

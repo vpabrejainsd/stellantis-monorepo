@@ -1,11 +1,11 @@
 from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
-from core.dynamic_estimator import get_dynamic_job_estimate
+from core.dynamic_estimator import get_dynamic_job_estimate, get_dynamic_task_estimate
 from core.gemini_mapping import get_matching_services
 from core.job_card_creator import create_job_from_ui_input
 from recommender import recommend_engineers_memory_cf
-from job_manager import get_connection, get_task_ids_for_job, update_task_assignment 
+from job_manager import get_connection, get_task_ids_for_job, save_dynamic_estimated_time, update_task_assignment 
 import sqlite3
 from job_manager import (
     fetch_all_jobs,
@@ -296,6 +296,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
     for task_id in task_ids:
         engineer_assigned = None
         engineer_score = None
+        dynamic_estimated_time = None
         recommendation_reason = "No recommendation provided"
         status = "Failed: No available engineer"
 
@@ -310,6 +311,8 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
                     update_task_assignment(task_id, engineer_assigned, engineer_score) # Use new update_task_assignment
                     mark_engineer_unavailable(engineer_assigned)
                     status = "Assigned"
+                    _, dynamic_estimated_time = get_dynamic_task_estimate(task_id, engineer_assigned)
+                    save_dynamic_estimated_time(task_id, job_card_id, dynamic_estimated_time)
                     if engineer_score is None:
                         engineer_score = "N/A"  # Handle case where score is not provided
                     print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {engineer_score}")
@@ -319,13 +322,14 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         except Exception as e:
             status = f"Failed: Unexpected error during assignment - {str(e)}"
             print(f"Error assigning engineer to task {task_id}: {e}") # Log error on backend
-
+# !! TODO UPDATE THE JOB_CARD TABLE WITH DYNAMIC ESTIMATED TIME
         assignment_results.append({
             "task_id": task_id,
             "engineer_assigned": engineer_assigned,
             "suitability_score": engineer_score,
             "status": status,
-            "recommendation_reason": recommendation_reason
+            "recommendation_reason": recommendation_reason,
+            "dynamic_estimated_time": dynamic_estimated_time
         })
 
     # Return a summary of all assignments
@@ -419,14 +423,14 @@ def mark_task_complete():
                 INSERT INTO job_history (
                     Job_ID, Job_Name, Task_Id, Task_Description, Status, Date_Completed, Urgency, VIN, Make, Model, Mileage, 
                     Engineer_Id, Engineer_Name, Engineer_Level, Time_Started, Time_Ended, Time_Taken_Minutes, Estimated_Standard_Time, 
-                    Outcome_Score
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    Outcome_Score, Suitability_Score, Dynamic_Estimated_Time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 record['Job_Id'], record['Job_Name'], record['Task_Id'], record['Task_Description'], 'Completed',
                 time_ended_dt.strftime('%Y-%m-%d %H:%M:%S'), record['Urgency'], record['VIN'], record['Make'],
                 record['Model'], record['Mileage'], record['Engineer_Id'], record['Engineer_Name'],
                 record['Engineer_Level'], record['Time_Started'], time_ended_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                time_taken, record['Estimated_Standard_Time'], outcome_score
+                time_taken, record['Estimated_Standard_Time'], outcome_score, record['Suitability_Score'], record['Dynamic_Estimated_Time']
             ))
 
             # --- Delete from job_card ---
@@ -474,9 +478,12 @@ def get_job_history():
                 "time_taken": row[16],
                 "estimated_standard_time": row[17],
                 "outcome_score": row[18],
+                "dynamic_estimated_time": row[19],
+                "suitability_score": row[20]
             }
             for row in rows
         ]
+        
         return jsonify(job_history), 200
 
     except sqlite3.Error as e:
