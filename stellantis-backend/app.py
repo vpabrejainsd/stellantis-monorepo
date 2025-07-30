@@ -7,6 +7,7 @@ from core.job_card_creator import create_job_from_ui_input
 from recommender import recommend_engineers_memory_cf
 from job_manager import get_connection, get_task_ids_for_job, save_dynamic_estimated_time, update_task_assignment 
 import sqlite3
+import math
 from job_manager import (
     fetch_all_jobs,
     fetch_unassigned_jobs,
@@ -33,6 +34,17 @@ DB_PATH = "database/workshop.db"
 # def get_connection():
 #     return sqlite3.connect(DB_PATH, timeout=10)
 
+def sanitize_jobs(jobs):
+    for job in jobs:
+        for key, value in job.items():
+            # Handle float NaN or inf values
+            if isinstance(value, float):
+                if math.isnan(value) or math.isinf(value):
+                    job[key] = 0  # or choose None / another sentinel
+            # For string fields, optionally handle known "NaN" strings
+            elif isinstance(value, str) and value.lower() == 'nan':
+                job[key] = "null"
+    return jobs
 
 @app.route('/api/v1/engineers', methods=['GET'])
 def get_all_engineers():
@@ -237,20 +249,31 @@ def create_job_endpoint():
 @app.route("/api/v1/jobs", methods=["GET"])
 def get_jobs():
     jobs_df = fetch_all_jobs()
-    jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0.0)
-
+    jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0)
+    
     jobs = jobs_df.to_dict(orient="records")
-
+    
+    # Sanitize all jobs to remove NaN/inf
+    jobs = sanitize_jobs(jobs)
+    
     for job in jobs:
         job_id = job.get("Job_Id")
-        success, result = get_dynamic_job_estimate(job_id)
-        print(f"Dynamic estimate for Job_ID {job_id}: {result}")
-        if success:
-            job["Dynamic_Estimate"] = result["Total_Estimate_Minutes"]
+        result_success, result = get_dynamic_job_estimate(job_id)
+        if result_success:
+            estimate = result.get("Total_Estimate_Minutes")
+            # Avoid assigning NaN/inf from your estimator
+            if estimate is None or not isinstance(estimate, (int, float)):
+                job["Dynamic_Estimate"] = 0
+            else:
+                job["Dynamic_Estimate"] = max(0, estimate)  # ensure non-negative number
             job["Estimate_Details"] = result
         else:
-            job["Dynamic_Estimate"] = "N/A"
+            job["Dynamic_Estimate"] = 0  # fallback safe value
+    
+    jobs = sanitize_jobs(jobs) # sanitize again if needed
+    
     return jsonify(jobs)
+
 
 @app.route('/api/v1/mapping-services', methods = ['POST'])
 def select_serv():
@@ -483,8 +506,8 @@ def get_job_history():
             }
             for row in rows
         ]
-        
-        return jsonify(job_history), 200
+        jobs = sanitize_jobs(job_history)
+        return jsonify(jobs), 200
 
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
