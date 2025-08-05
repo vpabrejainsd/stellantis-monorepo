@@ -1,6 +1,8 @@
 from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
+import pandas as pd
+from utils.helpers import safe_float
 from core.dynamic_estimator import get_dynamic_job_estimate, get_dynamic_task_estimate
 from core.gemini_mapping import get_matching_services
 from core.job_card_creator import create_job_from_ui_input
@@ -330,15 +332,14 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
                 status = f"Failed: Recommendation system error - {recommendations}"
             else:
                 engineer_assigned, engineer_score = recommendations
-                if engineer_assigned:
-                    update_task_assignment(task_id, engineer_assigned, engineer_score) # Use new update_task_assignment
+                if engineer_assigned and engineer_score:
+                    update_task_assignment(task_id, job_card_id, engineer_assigned, engineer_score) # Use new update_task_assignment
                     mark_engineer_unavailable(engineer_assigned)
                     status = "Assigned"
                     _, dynamic_estimated_time = get_dynamic_task_estimate(task_id, engineer_assigned)
                     save_dynamic_estimated_time(task_id, job_card_id, dynamic_estimated_time)
                     if engineer_score is None:
                         engineer_score = "N/A"  # Handle case where score is not provided
-                    print(f"Assigned engineer {engineer_assigned} to task {task_id} with score {engineer_score}")
                 else:
                     status = "Failed: No available engineer found in recommendations"
 
@@ -349,7 +350,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
         assignment_results.append({
             "task_id": task_id,
             "engineer_assigned": engineer_assigned,
-            "suitability_score": engineer_score,
+            "suitability_score": safe_float(engineer_score),
             "status": status,
             "recommendation_reason": recommendation_reason,
             "dynamic_estimated_time": dynamic_estimated_time
@@ -362,6 +363,7 @@ def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
             "assignments": assignment_results
         }
     ), 200
+
 
 @app.route('/api/v1/jobs/start-task', methods=['POST'])
 def start_task():

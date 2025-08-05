@@ -49,12 +49,11 @@ def save_dynamic_estimated_time(task_id, job_id, dynamic_estimated_time):
                 WHERE Task_Id = ? AND Job_Id = ?
             """, (dynamic_estimated_time, task_id, job_id))
             conn.commit()
-            print(f"Dynamic estimated time {dynamic_estimated_time} saved for Task {task_id} in Job {job_id}.")
         except sqlite3.Error as e:
             print(f"Error saving dynamic estimated time: {e}")
             conn.rollback()  # Roll back changes if the update fails
 
-def update_task_assignment(task_id, assigned_engineer_id, score):
+def update_task_assignment(task_id, job_id, assigned_engineer_id, score):
     """
     Updates the engineer details for a specific Task_ID in the job_card table.
 
@@ -103,11 +102,10 @@ def update_task_assignment(task_id, assigned_engineer_id, score):
                     Engineer_Level = ?, 
                     Suitability_Score = ?,
                     Status = 'Assigned' 
-                WHERE Task_ID = ?
-            """, (assigned_engineer_id, engineer_name, derived_engineer_level, score, task_id))
+                WHERE Task_ID = ? AND Job_Id = ?
+            """, (assigned_engineer_id, engineer_name, derived_engineer_level, score, task_id, job_id))
             
             conn.commit()
-            print(f"Successfully assigned Engineer {assigned_engineer_id} ({engineer_name}, Level: {derived_engineer_level}) to Task {task_id}.")
             
         except sqlite3.Error as e:
             print(f"Error updating job_card for Task {task_id}: {e}")
@@ -128,6 +126,23 @@ def fetch_available_engineers():
     with get_connection() as conn:
         return pd.read_sql("SELECT * FROM engineer_profiles WHERE Availability = 'Yes'", conn)
 
+def get_all_engineer_profiles_df(db_path=DB_PATH):
+    """
+    Connects to the SQLite database and returns the entire engineer_profiles table as a DataFrame.
+    
+    Args:
+        db_path (str): Path to your SQLite database file.
+        
+    Returns:
+        pd.DataFrame: DataFrame containing all engineers' profiles.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        query = "SELECT * FROM engineer_profiles"
+        df = pd.read_sql_query(query, conn)
+    finally:
+        conn.close()
+    return df
 
 def check_availability(engineer_id):
     with get_connection() as conn:
@@ -142,8 +157,6 @@ def mark_engineer_unavailable(engineer_id):
         conn.execute(
             "UPDATE engineer_profiles SET Availability = 'No' WHERE Engineer_ID = ?", (engineer_id,))
         conn.commit()
-        print(f"Engineer {engineer_id} marked as unavailable")
-
 
 def mark_engineer_available(conn, engineer_id):
     """
@@ -178,33 +191,33 @@ def get_task_id_for_job(job_card_id):
         return row[0] if row else None
 
 
-def assign_engineers_to_pending_jobs():
-    jobs = fetch_unassigned_jobs()
+# def assign_engineers_to_pending_jobs():
+#     jobs = fetch_unassigned_jobs()
 
-    for _, row in jobs.iterrows():
-        job_id = row["Job_Card_ID"]
-        task_id = row["Task_ID"]
+#     for _, row in jobs.iterrows():
+#         job_id = row["Job_Card_ID"]
+#         task_id = row["Task_ID"]
 
-        print(f"\nAssigning job: {job_id} with task: {task_id}")
+#         print(f"\nAssigning job: {job_id} with task: {task_id}")
 
-        recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
+#         recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
 
-        if isinstance(recommendations, str):
-            print(f"{recommendations}")
-            continue
+#         if isinstance(recommendations, str):
+#             print(f"{recommendations}")
+#             continue
 
-        assigned_engineer = None
+#         assigned_engineer = None
 
-        for eng_id, score in recommendations:
-            if check_availability(eng_id):
-                assigned_engineer = eng_id
-                break
+#         for eng_id, score in recommendations:
+#             if check_availability(eng_id):
+#                 assigned_engineer = eng_id
+#                 break
 
-        if assigned_engineer:
-            update_task_assignment(job_id, assigned_engineer)
-            mark_engineer_unavailable(assigned_engineer)
-        else:
-            print(f"[No available engineer for job {job_id}]")
+#         if assigned_engineer:
+#             update_task_assignment(job_id, assigned_engineer)
+#             mark_engineer_unavailable(assigned_engineer)
+#         else:
+#             print(f"[No available engineer for job {job_id}]")
 
 
 def complete_job(job_card_id, outcome_score):

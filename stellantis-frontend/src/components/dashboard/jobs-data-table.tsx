@@ -703,9 +703,9 @@ export function JobsDataTable() {
 
       setData(
         Object.values(groupedJobs).sort((a, b) => {
-          const dateA = new Date(a.Date_Created).getTime();
-          const dateB = new Date(b.Date_Created).getTime();
-          return dateB - dateA;
+          const idA = parseInt(a.Job_Id.replace(/\D/g, ""), 10); // Extract numeric part
+          const idB = parseInt(b.Job_Id.replace(/\D/g, ""), 10);
+          return idB - idA; // Descending order
         }),
       );
     } catch (error) {

@@ -18,22 +18,36 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   LineChart,
   Line,
   CartesianGrid,
-  Legend, // ADDED: Legend for Pie Chart
+  Legend,
+  Cell,
 } from "recharts";
-import { format, subDays, parseISO, isToday } from "date-fns"; // ADDED: isToday
+import {
+  startOfToday,
+  addHours,
+  format,
+  subDays,
+  parseISO,
+  isToday,
+} from "date-fns";
 import type { EngineerProfile, JobTask, JobHistoryTask } from "@/lib/types";
 import { ActiveTasksTable } from "./active-tasks-table";
+import { Car } from "lucide-react";
 
-// --- PRIMARY COLOR ---
+// --- Theme Colors ---
 const PRIMARY = "hsl(227, 57%, 33%)";
 
-// --- KPI Card ---
+const STATUS_COLORS: Record<string, string> = {
+  Pending: "#eab308",
+  Assigned: "#3b82f6",
+  "In Progress": "#06b6d4",
+  Completed: "#22c55e",
+};
+
+// --- KPI Card Component ---
+// Simple reusable KPI tile with label, value, and optional color
 function KPI({
   label,
   value,
@@ -44,42 +58,47 @@ function KPI({
   color?: string;
 }) {
   return (
-    // CHANGED: Responsive min-width for better stacking on small screens.
     <Card className="min-w-0 flex-1">
       <CardContent className="flex flex-col items-center py-4">
-        {/* CHANGED: Responsive font size for value. */}
         <div
           className="text-xl font-bold sm:text-2xl"
-          style={color ? { color } : {}}
+          style={color ? { color } : undefined}
         >
           {value}
         </div>
-        {/* CHANGED: Smaller text for label. */}
         <div className="text-muted-foreground text-center text-xs">{label}</div>
       </CardContent>
     </Card>
   );
 }
 
-// --- Fetch Dashboard Data ---
+// --- Dashboard Data Fetching & Preparation ---
+// Fetch engineers, jobs, job history, and prepare dashboard data
 function useDashboardData() {
   const [loading, setLoading] = React.useState(true);
   const [data, setData] = React.useState<null | {
     totalEngineers: number;
     totalTasks: number;
+    carsInGarage: number;
     tasksInProgress: number;
     tasksAssigned: number;
     tasksCompletedToday: number;
     avgOutcomeScoreToday: string;
+    totalJobCardsCreatedToday: number;
+    activeJobCardsToday: number;
+    totalTasksCreated: number;
+    activePendingAssignedTasks: number;
     tasksPerStatus: { status: string; count: number }[];
     tasksPerTypeToday: { type: string; value: number }[];
     tasksCompletedLast7Days: { date: string; completed: number }[];
+    hourlyStats: { hour: string; created: number; completed: number }[];
     activeTasksList: JobTask[];
   }>(null);
 
   React.useEffect(() => {
     async function fetchData() {
       try {
+        // Fetch all relevant data in parallel
         const [engineersRes, jobsRes, jobHistoryRes] = await Promise.all([
           fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/engineers`),
           fetch(`${process.env.NEXT_PUBLIC_FLASK_API_URL}/jobs`),
@@ -89,25 +108,72 @@ function useDashboardData() {
         const engineers: EngineerProfile[] = await engineersRes.json();
         const jobs: JobTask[] = await jobsRes.json();
         const jobHistory: JobHistoryTask[] = await jobHistoryRes.json();
+        const todayStr = format(new Date(), "yyyy-MM-dd");
+        // All Job IDs created today from jobs and history
+        const jobsCreatedTodaySet = new Set([
+          // From active jobs:
+          ...jobs
+            .filter((j) => j.Date_Created?.startsWith(todayStr))
+            .map((j) => j.Job_Id),
+          // From completed jobs (history)—assuming time_started exists in history:
+          ...jobHistory
+            .filter((j) => j.time_started?.startsWith(todayStr))
+            .map((j) => j.job_id),
+        ]);
+        const totalJobCardsCreatedToday = jobsCreatedTodaySet.size;
+
+        // Determine which of today's Job Cards are still "active"
+        const activeJobCardsTodaySet = new Set(
+          jobs
+            .filter(
+              (j) =>
+                j.Date_Created &&
+                j.Date_Created.startsWith(todayStr) &&
+                j.Status !== "Completed",
+            )
+            .map((j) => j.Job_Id),
+        );
+        const activeJobCardsToday = activeJobCardsTodaySet.size;
+        // Filter active tasks created today
+        const activeJobsCreatedToday = jobs.filter((task) =>
+          task.Date_Created?.startsWith(todayStr),
+        );
+
+        // Filter completed tasks created today — from job history,
+        // assuming jobHistory has a field for task creation date/time, e.g. time_started
+        const completedJobsCreatedToday = jobHistory.filter((task) =>
+          task.time_started?.startsWith(todayStr),
+        );
+
+        const totalTasksCreated =
+          activeJobsCreatedToday.length + completedJobsCreatedToday.length;
+        const activeJobs = jobs.filter((t) => t.Status !== "Completed");
+
+        const activePendingAssignedTasks = jobs.filter(
+          (task) => task.Status === "Pending" || task.Status === "Assigned",
+        ).length;
+
+        const carsInGarageSet = new Set(activeJobs.map((job) => job.VIN));
+        const carsInGarage = carsInGarageSet.size;
 
         // --- Compute KPIs ---
         const totalEngineers = engineers.length;
-        const activeTasks = jobs.filter(
-          (t) => (t.Status as string) !== "Completed",
-        );
-        const totalTasks = activeTasks.length;
-        const tasksInProgress = activeTasks.filter(
+        const totalTasks = activeJobs.length;
+        const tasksInProgress = activeJobs.filter(
           (t) => t.Status === "In Progress",
         ).length;
-        const tasksAssigned = activeTasks.filter(
+        const tasksAssigned = activeJobs.filter(
           (t) => t.Status === "Assigned",
         ).length;
 
         const today = new Date();
+
+        // Count tasks completed today
         const tasksCompletedToday = jobHistory.filter(
           (t) => t.date_completed && isToday(parseISO(t.date_completed)),
         ).length;
 
+        // Average outcome score for tasks completed today
         const outcomeScoresToday = jobHistory
           .filter(
             (t) => t.date_completed && isToday(parseISO(t.date_completed)),
@@ -121,17 +187,58 @@ function useDashboardData() {
             ).toFixed(2)
           : "N/A";
 
-        // --- Chart Data ---
+        // --- Prepare Hourly Stats for Today ---
+        // Tasks created and completed per hour
+        const hourlyStats: {
+          hour: string;
+          created: number;
+          completed: number;
+        }[] = [];
+        const now = new Date();
+        const start = startOfToday();
+        const maxHour = now.getHours();
+
+        for (let h = 0; h <= maxHour; h++) {
+          const hourStart = addHours(start, h);
+          const label = format(hourStart, "h a"); // e.g. "8 AM"
+
+          // Tasks created in this hour (based on Date_Created)
+          const createdCount = jobs.filter(
+            (job) =>
+              job.Date_Created &&
+              isToday(parseISO(job.Date_Created)) &&
+              parseISO(job.Date_Created).getHours() === h,
+          ).length;
+
+          // Tasks completed in this hour
+          const completedCount = jobHistory.filter(
+            (job) =>
+              job.date_completed &&
+              isToday(parseISO(job.date_completed)) &&
+              parseISO(job.date_completed).getHours() === h,
+          ).length;
+
+          hourlyStats.push({
+            hour: label,
+            created: createdCount,
+            completed: completedCount,
+          });
+        }
+
+        // --- Chart Data: Tasks per Status ---
         const currentStatuses = ["Pending", "Assigned", "In Progress"];
         const tasksPerStatus = currentStatuses.map((status) => ({
           status,
-          count: activeTasks.filter((t) => t.Status === status).length,
+          count: activeJobs.filter((t) => t.Status === status).length,
         }));
+
+        // Add today's completed as separate bar
         tasksPerStatus.push({
-          status: "Completed Today",
+          status: "Completed",
           count: tasksCompletedToday,
         });
 
+        // --- Chart Data: Task Types Completed Today ---
         const taskTypeMapToday: Record<string, number> = {};
         jobHistory
           .filter(
@@ -142,10 +249,12 @@ function useDashboardData() {
             if (!desc) return;
             taskTypeMapToday[desc] = (taskTypeMapToday[desc] ?? 0) + 1;
           });
+
         const tasksPerTypeToday = Object.entries(taskTypeMapToday)
           .map(([type, value]) => ({ type, value }))
           .sort((a, b) => b.value - a.value);
 
+        // --- Chart Data: Tasks Completed Last 7 Days ---
         const last7Days = Array.from({ length: 7 }).map((_, i) =>
           format(subDays(today, 6 - i), "yyyy-MM-dd"),
         );
@@ -156,56 +265,50 @@ function useDashboardData() {
           ).length,
         }));
 
+        // --- Active Tasks List (Show all assigned or in progress tasks) ---
         const activeTasksList = jobs.filter(
           (task) => task.Status === "Assigned" || task.Status === "In Progress",
         );
 
+        // --- Set all fetched and processed data to state ---
         setData({
           totalEngineers,
           totalTasks,
+          activePendingAssignedTasks,
+          carsInGarage,
           tasksInProgress,
           tasksAssigned,
+          totalJobCardsCreatedToday,
+          activeJobCardsToday,
           tasksCompletedToday,
           avgOutcomeScoreToday,
           tasksPerStatus,
+          totalTasksCreated,
           tasksPerTypeToday,
           tasksCompletedLast7Days,
+          hourlyStats,
           activeTasksList,
         });
+
         setLoading(false);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
         setLoading(false);
       }
     }
+
     void fetchData();
-  }, []); // Empty dependency array means this runs once on component mount
+  }, []);
+
   return { loading, data };
 }
 
-// --- COLORS ---
-const STATUS_COLORS: Record<string, string> = {
-  Pending: "#eab308",
-  Assigned: "#3b82f6",
-  "In Progress": "#06b6d4",
-  "Completed Today": "#22c55e", // Changed to reflect daily context
-};
-const TASK_TYPE_COLORS = [
-  "hsl(227, 57%, 33%)",
-  "#22c55e",
-  "#eab308",
-  "#a21caf",
-  "#6366f1",
-  "#f97316",
-  "#ef4444", // More colors for variety
-  "#8b5cf6",
-  "#14b8a6",
-];
-
+// --- Main Dashboard Page ---
 export default function DashboardPage() {
   const { loading, data } = useDashboardData();
 
   if (loading || !data) {
+    // Loading skeleton placeholders
     return (
       <div className="space-y-6 p-2 sm:p-6">
         <Skeleton className="h-24 w-full" />
@@ -225,10 +328,10 @@ export default function DashboardPage() {
   }
 
   return (
-    // ADDED: Responsive padding for the main container.
+    // Main dashboard container with responsive padding
     <div className="space-y-8 p-2 sm:p-6">
+      {/* Header Section */}
       <div>
-        {/* CHANGED: Responsive font size for main heading. */}
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
           Manager Dashboard
         </h1>
@@ -238,36 +341,59 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* --- KPI WIDGETS --- */}
-      {/* CHANGED: Responsive grid for KPIs. Stacks more on smaller screens. */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         <KPI
           label="Total Engineers"
           value={data.totalEngineers}
           color="#6366f1"
         />
-        {/* Renamed "Total Tasks" to "Total Active Tasks" for clarity */}
-        <KPI label="Active Tasks" value={data.totalTasks} color={PRIMARY} />
-        <KPI label="In Progress" value={data.tasksInProgress} color="#06b6d4" />
-        {/* ADDED: KPI for Tasks Assigned */}
-        <KPI label="Assigned" value={data.tasksAssigned} color="#3b82f6" />
         <KPI
-          label="Completed Today"
+          label="Job Cards Created"
+          value={data.totalJobCardsCreatedToday}
+          color="#a21caf"
+        />
+        <KPI
+          label="Active Job Cards"
+          value={data.activeJobCardsToday}
+          color="#06b6d4"
+        />
+        <KPI
+          label="Tasks Created"
+          value={data.totalTasksCreated}
+          color={PRIMARY}
+        />
+        <KPI
+          label="Tasks in Queue"
+          value={data.activePendingAssignedTasks}
+          color="#f97316"
+        />
+
+        <KPI
+          label="Tasks in Progress"
+          value={data.tasksInProgress}
+          color="#06b6d4"
+        />
+        <KPI
+          label="Tasks Assigned"
+          value={data.tasksAssigned}
+          color="#3b82f6"
+        />
+        <KPI
+          label="Tasks Completed"
           value={data.tasksCompletedToday}
           color="#22c55e"
         />
-        {/* CHANGED: KPI for Avg. Outcome Score Today */}
         <KPI
-          label="Avg. Outcome Today"
+          label="Average Outcome"
           value={data.avgOutcomeScoreToday}
           color="#a21caf"
         />
       </div>
 
-      {/* --- CHARTS --- */}
-      {/* ADDED: Grid container for the first two charts to sit side-by-side on larger screens. */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Task Status Distribution (Bar Chart for current statuses) */}
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 gap-4">
+        {/* Current Task Status Bar Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Current Task Status</CardTitle>
@@ -283,9 +409,9 @@ export default function DashboardPage() {
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="count" fill={PRIMARY}>
-                  {data.tasksPerStatus.map((entry, index) => (
+                  {data.tasksPerStatus.map((entry, idx) => (
                     <Cell
-                      key={`cell-${index}`}
+                      key={`cell-${idx}`}
                       fill={STATUS_COLORS[entry.status]}
                     />
                   ))}
@@ -295,40 +421,85 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Task Type Distribution Today (Pie Chart) */}
+        {/* Today's Task Flow Line Chart (Created & Completed per Hour) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Today&apos;s Task Flow</CardTitle>
+            <CardDescription>
+              Number of tasks created and completed per hour today.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.hourlyStats.length > 0 ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart
+                  data={data.hourlyStats}
+                  margin={{ top: 8, right: 24, left: 10, bottom: 25 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="hour"
+                    tick={{ fontSize: 11 }}
+                    interval={0}
+                    angle={-30}
+                    textAnchor="end"
+                  />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend verticalAlign="top" height={36} />
+                  <Line
+                    type="monotone"
+                    dataKey="created"
+                    name="Created"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="completed"
+                    name="Completed"
+                    stroke="#22c55e"
+                    strokeWidth={3}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
+                No task activity yet today.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Task Types Completed Today Horizontal Bar Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Task Types Completed Today</CardTitle>
             <CardDescription>
-              Distribution of task types finished this day.
+              Number of each task type completed today, by count.
             </CardDescription>
           </CardHeader>
           <CardContent>
             {data.tasksPerTypeToday.length > 0 ? (
               <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie
-                    data={data.tasksPerTypeToday}
-                    dataKey="value"
-                    nameKey="type"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={90}
-                    labelLine={false} // Hide label lines for cleaner look
-                    label={({ name, percent }) =>
-                      `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                    }
-                  >
-                    {data.tasksPerTypeToday.map((entry, idx) => (
-                      <Cell
-                        key={entry.type}
-                        fill={TASK_TYPE_COLORS[idx % TASK_TYPE_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
+                <BarChart layout="vertical" data={data.tasksPerTypeToday}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis
+                    dataKey="type"
+                    type="category"
+                    width={120}
+                    tick={{ fontSize: 12 }}
+                  />
                   <Tooltip />
-                  <Legend /> {/* ADDED: Legend for Pie Chart */}
-                </PieChart>
+                  <Bar dataKey="value" fill={PRIMARY} barSize={20}>
+                    {data.tasksPerTypeToday.map((entry) => (
+                      <Cell key={entry.type} fill={PRIMARY} />
+                    ))}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="text-muted-foreground flex h-full items-center justify-center">
@@ -339,7 +510,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Tasks Completed Over Last 7 Days (Line Chart) */}
+      {/* Tasks Completed Last 7 Days Line Chart */}
       <Card>
         <CardHeader>
           <CardTitle>Tasks Completed Last 7 Days</CardTitle>
@@ -362,12 +533,13 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Active Tasks Table: Assigned or In Progress */}
       <Card>
         <CardHeader>
           <CardTitle>Active Tasks</CardTitle>
           <CardDescription>
-            A real-time list of tasks that are currently assigned or in
-            progress.
+            A real-time list of tasks currently assigned or in progress.
           </CardDescription>
         </CardHeader>
         <CardContent>

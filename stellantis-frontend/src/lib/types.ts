@@ -82,7 +82,7 @@ export interface JobTask {
   Make: string;
   Mileage: number;
   Model: string;
-  Status: "Pending" | "Assigned" | "In Progress";
+  Status: "Pending" | "Assigned" | "In Progress" | "Completed";
   Task_Description: string;
   Task_Id: string;
   Time_Started: string | null;
@@ -176,26 +176,6 @@ export interface EngineerProfile {
   Visual_Inspection_Score: number;
   Wheel_Alignment_and_Balancing_Score: number;
   Overall_Performance_Score: number;
-}
-
-// /jobs (active jobs)
-export interface JobTask {
-  Date_Created: string;
-  Engineer_Id: string | null;
-  Engineer_Level: string | null;
-  Engineer_Name: string | null;
-  Estimated_Standard_Time: number;
-  Job_Id: string;
-  Job_Name: string;
-  Make: string;
-  Mileage: number;
-  Model: string;
-  Status: "Pending" | "Assigned" | "In Progress";
-  Task_Description: string;
-  Task_Id: string;
-  Time_Started: string | null;
-  Urgency: string;
-  VIN: string;
 }
 
 // /job-history (completed jobs)
