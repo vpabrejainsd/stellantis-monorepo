@@ -6,9 +6,9 @@ import { useParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { type EngineerProfile, type EnrichedEngineerTask } from "@/lib/types";
 import { EngineerHeader } from "@/components/dashboard/engineer-header";
-import { EngineerPerformanceLineChart } from "@/components/dashboard/engineer-performance-line-chart";
-import { EngineerSkillsRadarChart } from "@/components/dashboard/engineer-skills-radar-chart";
-import { EngineerTasksTable } from "@/components/dashboard/engineer-tasks-table"; // NEW IMPORT
+import { EngineerPerformanceLineChart } from "@/components/dashboard/charts/engineer-performance-line-chart";
+import { EngineerSkillsRadarChart } from "@/components/dashboard/charts/engineer-skills-radar-chart";
+import { EngineerTasksTable } from "@/components/dashboard/tables/engineer-tasks-table"; // NEW IMPORT
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -17,8 +17,8 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { EngineerTaskFrequencyChart } from "@/components/dashboard/tasks-frequency-chart";
-import { EngineerTaskPerformanceChart } from "@/components/dashboard/engineer-task-performance-line-chart";
+import { EngineerTaskFrequencyChart } from "@/components/dashboard/charts/tasks-frequency-chart";
+import { EngineerTaskPerformanceChart } from "@/components/dashboard/charts/engineer-task-performance-line-chart";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Table,

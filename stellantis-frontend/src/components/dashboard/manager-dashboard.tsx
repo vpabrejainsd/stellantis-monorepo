@@ -33,7 +33,7 @@ import {
   isToday,
 } from "date-fns";
 import type { EngineerProfile, JobTask, JobHistoryTask } from "@/lib/types";
-import { ActiveTasksTable } from "./active-tasks-table";
+import { ActiveTasksTable } from "./tables/active-tasks-table";
 import { Car } from "lucide-react";
 
 // --- Theme Colors ---

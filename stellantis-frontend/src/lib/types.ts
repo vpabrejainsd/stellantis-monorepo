@@ -110,6 +110,7 @@ export interface UnifiedTask {
   Job_Name: string;
   Date_Created: string;
   Urgency: string;
+  Time_Ended?: string | null; // Only present in completed tasks
 }
 
 export interface Job {

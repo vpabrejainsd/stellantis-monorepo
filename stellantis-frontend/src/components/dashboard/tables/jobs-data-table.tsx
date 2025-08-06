@@ -16,12 +16,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import {
-  differenceInMinutes,
-  isWithinInterval,
-  parseISO,
-  startOfDay,
-} from "date-fns";
+import { isWithinInterval, parseISO, startOfDay } from "date-fns";
 import { ChevronDown, MoreHorizontal, Star, User } from "lucide-react";
 import * as React from "react";
 import { type DateRange } from "react-day-picker";
@@ -40,7 +35,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -69,11 +63,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../ui/dialog";
-import { useEffect } from "react";
-import { ProgressBar } from "./progress-bar";
-import { randomInt } from "node:crypto";
+} from "@/components/ui/dialog";
+import { useEffect, useRef } from "react";
+import { ProgressBar } from "@/components/shared/progress-bar";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const formatMinutes = (mins: number): string => {
   const h = Math.floor(mins / 60);
@@ -88,11 +82,7 @@ const getJobRowColor = (status: Job["derivedCompletionStatus"]): string => {
   return "bg-transparent";
 };
 
-const getTaskRowColor = (
-  status: UnifiedTask["Status"],
-  timeTaken: number,
-  estimated: number,
-): string => {
+const getTaskRowColor = (status: UnifiedTask["Status"]): string => {
   if (status === "Completed") return "bg-green-100/50 dark:bg-green-900/20";
   if (status === "In Progress") return "bg-yellow-100/50 dark:bg-yellow-900/20";
   return "bg-transparent";
@@ -369,19 +359,16 @@ function TaskDetailsSubComponent({
           <span>{progress.toPrecision(3)}%</span>
         </div>
         {/* ADDED: Responsive font size */}
-        <h4 className="mb-2 text-base font-semibold sm:text-lg">
-          Tasks for this Job:
-        </h4>
+        <h4 className="mb-2 text-base font-semibold">Tasks for this Job:</h4>
       </div>
       {/* ADDED: Wrapper to make the inner table horizontally scrollable. */}
       <div className="w-full overflow-x-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="text-sm">
             <TableRow>
               <TableHead>Task</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Assigned Engineer</TableHead>
-              {/* CHANGED: Hide less critical columns on small screens */}
               <TableHead className="hidden lg:table-cell">
                 Suitability Score
               </TableHead>
@@ -393,9 +380,8 @@ function TaskDetailsSubComponent({
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="text-xs">
             {tasks.map((task) => {
-              // ... (logic for colors and estimates remains the same) ...
               const standardTime = task.Estimated_Standard_Time;
               const dynamicEstimate =
                 task.Status !== "Completed"
@@ -426,11 +412,7 @@ function TaskDetailsSubComponent({
               return (
                 <TableRow
                   key={task.Task_Id}
-                  className={getTaskRowColor(
-                    task.Status,
-                    task.timeTaken,
-                    task.Estimated_Standard_Time,
-                  )}
+                  className={getTaskRowColor(task.Status)}
                 >
                   <TableCell className="font-medium">
                     {task.Task_Description}
@@ -611,6 +593,8 @@ const columns: ColumnDef<Job>[] = [
 
 // --- MAIN DATA TABLE COMPONENT ---
 export function JobsDataTable() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = React.useState<Job[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -619,6 +603,10 @@ export function JobsDataTable() {
   );
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");
+
+  const jobParam = searchParams.get("job");
+  const pageParam = searchParams.get("page");
+  const isSettingParamsRef = useRef(false);
 
   const fetchAndProcessData = React.useCallback(async () => {
     setIsLoading(true);
@@ -634,10 +622,7 @@ export function JobsDataTable() {
       const normalizedCurrentTasks: UnifiedTask[] = currentTasks.map(
         (task) => ({
           ...task,
-          timeTaken: task.Time_Started
-            ? differenceInMinutes(new Date(), parseISO(task.Time_Started))
-            : 0,
-          // These fields are only on /jobs
+          timeTaken: 0,
           Dynamic_Estimate: task.Dynamic_Estimate,
           Estimate_Details: task.Estimate_Details,
         }),
@@ -661,6 +646,7 @@ export function JobsDataTable() {
           Date_Created: task.time_started,
           Urgency: task.urgency,
           Dynamic_Estimate: task.dynamic_estimated_time,
+          Time_Ended: task.time_ended ?? null,
         }),
       );
       const allTasks = [...normalizedCurrentTasks, ...normalizedHistoryTasks];
@@ -758,7 +744,7 @@ export function JobsDataTable() {
       {/* ADDED: `overflow-x-auto` to allow the table to be scrolled horizontally on small screens. */}
       <div className="w-full overflow-x-auto rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className="text-sm">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -792,7 +778,7 @@ export function JobsDataTable() {
                   <TableRow
                     data-state={row.getIsExpanded() && "selected"}
                     onClick={row.getToggleExpandedHandler()}
-                    className={`cursor-pointer ${getJobRowColor(row.original.derivedCompletionStatus)}`}
+                    className={`cursor-pointer text-xs ${getJobRowColor(row.original.derivedCompletionStatus)}`}
                   >
                     {row.getVisibleCells().map((cell) => (
                       // CHANGED: Apply same responsive classes to the data cells.

@@ -1,4 +1,4 @@
-import { JobsDataTable } from "@/components/dashboard/jobs-data-table";
+import { JobsDataTable } from "@/components/dashboard/tables/jobs-data-table";
 
 const JobsPage = () => {
   return (
