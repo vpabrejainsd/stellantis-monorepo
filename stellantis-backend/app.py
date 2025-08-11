@@ -1,90 +1,63 @@
 from datetime import datetime
+import sqlite3
+import math
+
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 import pandas as pd
-from utils.helpers import safe_float
+
+# Core business logic imports
+from utils.helpers import safe_float, sanitize_jobs
 from core.dynamic_estimator import get_dynamic_job_estimate, get_dynamic_task_estimate
 from core.gemini_mapping import get_matching_services
 from core.job_card_creator import create_job_from_ui_input
 from recommender import recommend_engineers_memory_cf
-from job_manager import get_connection, get_task_ids_for_job, save_dynamic_estimated_time, update_task_assignment 
-import sqlite3
-import math
 from job_manager import (
+    get_connection, 
+    get_task_ids_for_job, 
+    save_dynamic_estimated_time, 
+    update_task_assignment,
     fetch_all_jobs,
     fetch_unassigned_jobs,
     fetch_available_engineers,
-    check_availability,
-    # update_job_assignment,
     mark_engineer_unavailable,
     mark_engineer_available,
-    get_task_id_for_job,
-    complete_job,
 )
 
-
+# Flask app initialization
 app = Flask(__name__)
 CORS(app)
-# def _build_cors_preflight_response():
-#     response = make_response()
-#     response.headers.add("Access-Control-Allow-Origin", "*")
-#     response.headers.add('Access-Control-Allow-Headers', "*")
-#     response.headers.add('Access-Control-Allow-Methods', "*")
-#     return response
 
+# Configuration
 DB_PATH = "database/workshop.db"
-# def get_connection():
-#     return sqlite3.connect(DB_PATH, timeout=10)
 
-def sanitize_jobs(jobs):
-    for job in jobs:
-        for key, value in job.items():
-            # Handle float NaN or inf values
-            if isinstance(value, float):
-                if math.isnan(value) or math.isinf(value):
-                    job[key] = 0  # or choose None / another sentinel
-            # For string fields, optionally handle known "NaN" strings
-            elif isinstance(value, str) and value.lower() == 'nan':
-                job[key] = "null"
-    return jobs
+# =============================================================================
+# ENGINEER MANAGEMENT ROUTES
+# =============================================================================
 
 @app.route('/api/v1/engineers', methods=['GET'])
 def get_all_engineers():
-    """
-    Fetches all engineer profiles from the database and returns them as JSON.
-    """
+    """Fetches all engineer profiles from the database and returns them as JSON."""
     try:
-        # Use a context manager for safe connection handling
         with get_connection() as conn:
-            # Set the row_factory to sqlite3.Row to get dictionary-like results
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
             cursor.execute('SELECT * FROM engineer_profiles')
-            
-            # fetchall() will now return a list of sqlite3.Row objects
             rows = cursor.fetchall()
-            
-            # Convert the list of Row objects into a list of dictionaries
-            # This is a clean and standard way to create JSON-serializable data
             engineers = [dict(row) for row in rows]
             
         return jsonify(engineers), 200
     except Exception as e:
-        # Return a generic server error if anything goes wrong
-        print(f"Error fetching engineers: {e}") # Log the error for debugging
+        print(f"Error fetching engineers: {e}")
         return jsonify({'error': 'An internal server error occurred'}), 500
 
 @app.route('/api/v1/engineers/<string:engineer_id>', methods=['GET'])
 def get_engineer_profile(engineer_id):
-    """
-    Fetches the profile data for a single engineer.
-    """
+    """Fetches the profile data for a single engineer."""
     try:
         with get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
             cursor.execute('SELECT * FROM engineer_profiles WHERE Engineer_ID = ?', (engineer_id,))
             engineer = cursor.fetchone()
             
@@ -101,72 +74,44 @@ def get_engineer_details(engineer_id):
     """
     Fetches all details for a specific engineer, including their full profile
     and a complete list of all their tasks (ongoing and historical).
-    This is achieved with a single, efficient SQL query.
     """
     try:
         with get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            # First, check if the engineer exists to provide a clean 404 error
+            # Check if engineer exists
             cursor.execute('SELECT 1 FROM engineer_profiles WHERE Engineer_ID = ?', (engineer_id,))
             if not cursor.fetchone():
                 return jsonify({'error': 'Engineer not found'}), 404
 
-            # This powerful query uses a Common Table Expression (CTE) to unify tasks
-            # from two tables and then joins the engineer's profile to each task.
+            # Unified query for all tasks (active and historical)
             sql = """
                 WITH all_tasks AS (
-                    -- Select from active jobs in job_card
+                    -- Active jobs from job_card
                     SELECT 
-                        Job_Id, 
-                        Task_Id, 
-                        Task_Description, 
-                        Status, 
-                        Estimated_Standard_Time, 
-                        Time_Started, 
-                        'ongoing' as source, 
-                        NULL as Outcome_Score, 
-                        NULL as Time_Taken_minutes,
-                        Engineer_Id,
-                        VIN,
-                        Make,
-                        Model
+                        Job_Id, Task_Id, Task_Description, Status, Estimated_Standard_Time, 
+                        Time_Started, 'ongoing' as source, NULL as Outcome_Score, 
+                        NULL as Time_Taken_minutes, Engineer_Id, VIN, Make, Model
                     FROM job_card
                     WHERE Engineer_Id = ?
                     
                     UNION ALL
                     
-                    -- Select from completed jobs in job_history, aliasing columns to match
+                    -- Completed jobs from job_history
                     SELECT 
-                        Job_ID AS Job_Id, 
-                        Task_Id, 
-                        Task_Description, 
-                        Status, 
-                        Estimated_Standard_Time, 
-                        Time_Started, 
-                        'history' as source, 
-                        Outcome_Score, 
-                        Time_Taken_minutes,
-                        Engineer_Id,
-                        VIN,
-                        Make,
-                        Model
+                        Job_ID AS Job_Id, Task_Id, Task_Description, Status, Estimated_Standard_Time, 
+                        Time_Started, 'history' as source, Outcome_Score, Time_Taken_minutes,
+                        Engineer_Id, VIN, Make, Model
                     FROM job_history
                     WHERE Engineer_Id = ?
                 )
-                -- LEFT JOIN the unified tasks with the engineer's full profile
-                SELECT
-                    t.*,        -- Selects all columns from the unified tasks (t)
-                    p.*         -- Selects all columns from the engineer's profile (p)
+                SELECT t.*, p.*
                 FROM all_tasks t
                 LEFT JOIN engineer_profiles p ON t.Engineer_Id = p.Engineer_ID;
             """
             
-            # The engineer_id is used twice, once for each part of the UNION
             cursor.execute(sql, (engineer_id, engineer_id))
-            
-            # The result is a list of tasks, each enriched with the full engineer profile
             enriched_tasks = [dict(row) for row in cursor.fetchall()]
             
         return jsonify(enriched_tasks), 200
@@ -178,224 +123,501 @@ def get_engineer_details(engineer_id):
         print(f"Error fetching details for engineer {engineer_id}: {e}")
         return jsonify({'error': 'An internal server error occurred'}), 500
 
-@app.route('/api/v1/timeline', methods=['GET'])
-def get_timeline_data():
-    """
-    Fetches all tasks that were active on a specific date.
-    'active' means tasks that were started, in progress, or completed on that day.
-    """
-    # Get the date from query parameters, default to today if not provided
-    date_str = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
-    
+# =============================================================================
+# JOB MANAGEMENT ROUTES
+# =============================================================================
+
+@app.route("/api/v1/jobs", methods=["GET"])
+def get_jobs():
+    """Get all jobs with dynamic estimates."""
+    try:
+        jobs_df = fetch_all_jobs()
+        jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0)
+        jobs = jobs_df.to_dict(orient="records")
+        jobs = sanitize_jobs(jobs)
+        
+        # Add dynamic estimates to each job
+        for job in jobs:
+            job_id = job.get("Job_Id")
+            result_success, result = get_dynamic_job_estimate(job_id)
+            if result_success:
+                estimate = result.get("Total_Estimate_Minutes")
+                if estimate is None or not isinstance(estimate, (int, float)):
+                    job["Dynamic_Estimate"] = 0
+                else:
+                    job["Dynamic_Estimate"] = max(0, estimate)
+                job["Estimate_Details"] = result
+            else:
+                job["Dynamic_Estimate"] = 0
+        
+        jobs = sanitize_jobs(jobs)
+        return jsonify(jobs), 200
+    except Exception as e:
+        print(f"Error fetching jobs: {e}")
+        return jsonify({'error': 'Failed to fetch jobs'}), 500
+@app.route("/api/v1/jobs/<string:job_id>", methods=["GET"])
+def get_job_by_id(job_id):
+    """Get a specific job from both active and history tables."""
     try:
         with get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-
-            # This query unifies tasks from both tables that were active on the target date
-            sql = """
-                SELECT 
-                    Job_Id, Task_Id, Task_Description, Status, Estimated_Standard_Time, 
-                    Time_Started, Engineer_Id, Engineer_Name, NULL as Time_Taken_minutes
-                FROM job_card
-                WHERE DATE(Time_Started) = ? OR (Status IN ('Pending', 'Assigned') AND DATE(Date_Created) <= ?)
-
-                UNION ALL
-
-                SELECT 
-                    Job_ID as Job_Id, Task_Id, Task_Description, Status, Estimated_Standard_Time, 
-                    Time_Started, Engineer_Id, Engineer_Name, Time_Taken_minutes
-                FROM job_history
-                WHERE DATE(Time_Started) = ?
-            """
             
-            cursor.execute(sql, (date_str, date_str, date_str))
-            tasks = [dict(row) for row in cursor.fetchall()]
+            # First check active jobs
+            cursor.execute("SELECT * FROM job_card WHERE Job_Id = ?", (job_id,))
+            active_tasks = cursor.fetchall()
             
-        return jsonify(tasks), 200
+            # Then check job history
+            cursor.execute("SELECT * FROM job_history WHERE Job_ID = ?", (job_id,))
+            history_tasks = cursor.fetchall()
+            
+            if not active_tasks and not history_tasks:
+                return jsonify({'error': 'Job not found'}), 404
+            
+            # Combine results
+            all_tasks = []
+            job_data = None
+            
+            # Process active tasks
+            for task in active_tasks:
+                task_dict = dict(task)
+                task_dict['source'] = 'active'
+                all_tasks.append(task_dict)
+                if not job_data:
+                    job_data = {
+                        'Job_Id': task_dict['Job_Id'],
+                        'Job_Name': task_dict['Job_Name'],
+                        'VIN': task_dict['VIN'],
+                        'Make': task_dict['Make'],
+                        'Model': task_dict['Model'],
+                        'Mileage': task_dict.get('Mileage'),
+                        'Urgency': task_dict['Urgency'],
+                        'Date_Created': task_dict['Date_Created'],
+                        'status': 'active'
+                    }
+            
+            # Process history tasks
+            for task in history_tasks:
+                task_dict = dict(task)
+                task_dict['source'] = 'history'
+                # Normalize column names for consistency
+                task_dict['Job_Id'] = task_dict.pop('Job_ID', task_dict.get('Job_Id'))
+                all_tasks.append(task_dict)
+                if not job_data:
+                    job_data = {
+                        'Job_Id': task_dict['Job_Id'],
+                        'Job_Name': task_dict['Job_Name'],
+                        'VIN': task_dict['VIN'],
+                        'Make': task_dict['Make'],
+                        'Model': task_dict['Model'],
+                        'Mileage': task_dict.get('Mileage'),
+                        'Urgency': task_dict['Urgency'],
+                        'Date_Created': task_dict.get('Time_Started'),
+                        'status': 'completed'
+                    }
+            
+            job_data['tasks'] = all_tasks
+            job_data['total_tasks'] = len(all_tasks)
+            job_data['active_tasks'] = len(active_tasks)
+            job_data['completed_tasks'] = len(history_tasks)
+            
+            return jsonify(job_data), 200
+            
     except Exception as e:
-        print(f"Error fetching timeline data for date {date_str}: {e}")
-        return jsonify({'error': 'An internal server error occurred'}), 500
+        print(f"Error fetching job {job_id}: {e}")
+        return jsonify({'error': 'Failed to fetch job'}), 500
 
-@app.route("/api/v1/create-job", methods=["POST"])
-def create_job_endpoint():
-    data = request.get_json()
+@app.route("/api/v1/jobs/<string:job_id>", methods=["PUT"])
+def update_job(job_id):
+    """Update job information in both active jobs and job history."""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Fields that can be updated
+        updatable_fields = {
+            'Make': data.get('make'),
+            'Model': data.get('model'), 
+            'VIN': data.get('vin'),
+            'Urgency': data.get('urgency')
+        }
+        
+        # Filter out None values
+        fields_to_update = {k: v for k, v in updatable_fields.items() if v is not None}
+        
+        if not fields_to_update:
+            return jsonify({'error': 'No valid fields provided to update'}), 400
+            
+        # Validation
+        if 'vin' in data:
+            vin = data['vin'].strip().upper()
+            if len(vin) != 17:
+                return jsonify({'error': 'VIN must be exactly 17 characters'}), 400
+            fields_to_update['VIN'] = vin
+            
+        if 'urgency' in data and data['urgency'] not in ['Low', 'Normal', 'High']:
+            return jsonify({'error': 'Invalid urgency level'}), 400
+            
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check both tables to find where the job exists
+            cursor.execute("SELECT COUNT(*) FROM job_card WHERE Job_Id = ?", (job_id,))
+            active_job_exists = cursor.fetchone()[0] > 0
+            
+            cursor.execute("SELECT COUNT(*) FROM job_history WHERE Job_ID = ?", (job_id,))
+            history_job_exists = cursor.fetchone()[0] > 0
+            
+            if not active_job_exists and not history_job_exists:
+                return jsonify({'error': 'Job not found in active jobs or history'}), 404
+            
+            updated_tables = []
+            
+            # Update active jobs if they exist
+            if active_job_exists:
+                set_clause = ", ".join([f"{field} = ?" for field in fields_to_update.keys()])
+                values = list(fields_to_update.values()) + [job_id]
+                
+                update_query = f"UPDATE job_card SET {set_clause} WHERE Job_Id = ?"
+                cursor.execute(update_query, values)
+                if cursor.rowcount > 0:
+                    updated_tables.append('active_jobs')
+            
+            # Update job history if they exist
+            if history_job_exists:
+                set_clause = ", ".join([f"{field} = ?" for field in fields_to_update.keys()])
+                values = list(fields_to_update.values()) + [job_id]
+                
+                update_query = f"UPDATE job_history SET {set_clause} WHERE Job_ID = ?"
+                cursor.execute(update_query, values)
+                if cursor.rowcount > 0:
+                    updated_tables.append('job_history')
+            
+            conn.commit()
+            
+            return jsonify({
+                'message': f'Job {job_id} updated successfully',
+                'updated_fields': list(fields_to_update.keys()),
+                'updated_tables': updated_tables,
+                'job_id': job_id
+            }), 200
+            
+    except sqlite3.Error as e:
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        print(f"Error updating job {job_id}: {e}")
+        return jsonify({'error': 'Failed to update job'}), 500
 
-    # Extract the data sent from the frontend
-    job_name = data.get('jobName')
-    vin = data.get('vin')
-    make = data.get('make')
-    model = data.get('model')
-    mileage = data.get('mileage')
-    urgency = data.get('urgency')
-    selected_tasks = data.get('selectedTasks') # This will be the list of Task IDs
-
-    # Basic validation
-    if not all([job_name, vin, make, model, mileage, urgency]):
-        return jsonify({'error': 'Missing required fields'}), 400
-
-    # Call your business logic function
-    success, message, generated_job_id = create_job_from_ui_input(
-        job_name=job_name,
-        vin=vin, make=make, model=model, mileage=mileage,
-        urgency=urgency,
-        selected_tasks=selected_tasks
-    )
-
-    if success:
-        # --- INCLUDE THE GENERATED JOB_ID IN THE RESPONSE ---
-        return jsonify({'message': message, 'job_id': generated_job_id}), 201
-    else:
-        return jsonify({'error': message}), 500
-
-@app.route("/api/v1/jobs", methods=["GET"])
-def get_jobs():
-    jobs_df = fetch_all_jobs()
-    jobs_df["Suitability_Score"] = jobs_df["Suitability_Score"].fillna(0)
-    
-    jobs = jobs_df.to_dict(orient="records")
-    
-    # Sanitize all jobs to remove NaN/inf
-    jobs = sanitize_jobs(jobs)
-    
-    for job in jobs:
-        job_id = job.get("Job_Id")
-        result_success, result = get_dynamic_job_estimate(job_id)
-        if result_success:
-            estimate = result.get("Total_Estimate_Minutes")
-            # Avoid assigning NaN/inf from your estimator
-            if estimate is None or not isinstance(estimate, (int, float)):
-                job["Dynamic_Estimate"] = 0
-            else:
-                job["Dynamic_Estimate"] = max(0, estimate)  # ensure non-negative number
-            job["Estimate_Details"] = result
-        else:
-            job["Dynamic_Estimate"] = 0  # fallback safe value
-    
-    jobs = sanitize_jobs(jobs) # sanitize again if needed
-    
-    return jsonify(jobs)
-
-
-@app.route('/api/v1/mapping-services', methods = ['POST'])
-def select_serv():
-    data = request.get_json()
-    user_input = data.get('description')
-
-    if not user_input:
-        return jsonify({"error": ""}), 400
-    
-    services = get_matching_services(user_input)
-    return jsonify({"services": services})
+@app.route("/api/v1/jobs/<string:job_id>", methods=["DELETE"])
+def delete_job(job_id):
+    """Delete a job from both active jobs and history."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check and get engineers from active jobs
+            cursor.execute("""
+                SELECT DISTINCT Engineer_Id FROM job_card 
+                WHERE Job_Id = ? AND Engineer_Id IS NOT NULL
+            """, (job_id,))
+            engineers_to_free = [row[0] for row in cursor.fetchall()]
+            
+            # Delete from active jobs
+            cursor.execute("DELETE FROM job_card WHERE Job_Id = ?", (job_id,))
+            deleted_active = cursor.rowcount
+            
+            # Delete from job history
+            cursor.execute("DELETE FROM job_history WHERE Job_ID = ?", (job_id,))
+            deleted_history = cursor.rowcount
+            
+            if deleted_active == 0 and deleted_history == 0:
+                return jsonify({'error': 'Job not found'}), 404
+            
+            # Free up engineers who were assigned to active tasks
+            for engineer_id in engineers_to_free:
+                mark_engineer_available(conn, engineer_id)
+            
+            conn.commit()
+            
+            return jsonify({
+                'message': f'Job {job_id} deleted successfully',
+                'deleted_active_tasks': deleted_active,
+                'deleted_history_tasks': deleted_history,
+                'freed_engineers': len(engineers_to_free)
+            }), 200
+            
+    except sqlite3.Error as e:
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        print(f"Error deleting job {job_id}: {e}")
+        return jsonify({'error': 'Failed to delete job'}), 500
 
 @app.route("/api/v1/jobs/unassigned", methods=["GET"])
 def get_unassigned_jobs():
-    jobs_df = fetch_unassigned_jobs()
-    jobs = jobs_df.to_dict(orient="records")
-    return jsonify(jobs)
+    """Get all unassigned jobs."""
+    try:
+        jobs_df = fetch_unassigned_jobs()
+        jobs = jobs_df.to_dict(orient="records")
+        return jsonify(jobs), 200
+    except Exception as e:
+        print(f"Error fetching unassigned jobs: {e}")
+        return jsonify({'error': 'Failed to fetch unassigned jobs'}), 500
 
-@app.route("/api/v1/engineers/available", methods=["GET"])
-def get_available_engineers():
-    eng_df = fetch_available_engineers()
-    engineers = eng_df.to_dict(orient="records")
-    return jsonify(engineers)
+@app.route("/api/v1/create-job", methods=["POST"])
+def create_job_endpoint():
+    """Create a new job from UI input."""
+    try:
+        data = request.get_json()
 
-# In app.py
+        # Extract required fields
+        job_name = data.get('jobName')
+        vin = data.get('vin')
+        make = data.get('make')
+        model = data.get('model')
+        mileage = data.get('mileage')
+        urgency = data.get('urgency')
+        selected_tasks = data.get('selectedTasks')
 
-@app.route("/api/v1/jobs/assign-all-tasks", methods=["POST"]) # Changed route name for clarity
-def assign_engineer_to_all_tasks_for_job(): # Changed function name for clarity
-    data = request.get_json()
-    job_card_id = data.get("job_card_id")
+        # Validation
+        if not all([job_name, vin, make, model, mileage, urgency]):
+            return jsonify({'error': 'Missing required fields'}), 400
 
-    if not job_card_id:
-        return jsonify({"error": "Missing job_card_id"}), 400
+        # Create job
+        success, message, generated_job_id = create_job_from_ui_input(
+            job_name=job_name, vin=vin, make=make, model=model, 
+            mileage=mileage, urgency=urgency, selected_tasks=selected_tasks
+        )
 
-    # Get ALL Task_IDs for this Job_Card_ID
-    task_ids = get_task_ids_for_job(job_card_id) # Use the new plural function
-    if not task_ids:
-        return jsonify({"error": f"No tasks found for Job_Card_ID {job_card_id}"}), 404
+        if success:
+            return jsonify({'message': message, 'job_id': generated_job_id}), 201
+        else:
+            return jsonify({'error': message}), 500
+    except Exception as e:
+        print(f"Error creating job: {e}")
+        return jsonify({'error': 'Failed to create job'}), 500
 
-    assignment_results = []
-    
-    # Loop through each individual task
-    for task_id in task_ids:
-        engineer_assigned = None
-        engineer_score = None
-        dynamic_estimated_time = None
-        recommendation_reason = "No recommendation provided"
-        status = "Failed: No available engineer"
+@app.route("/api/v1/job-history", methods=["GET"])
+def get_job_history():
+    """Get all completed job history."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM job_history")
+            rows = cursor.fetchall()
+            
+            job_history = [
+                {
+                    "job_id": row[0], "job_name": row[1], "task_id": row[2],
+                    "task_description": row[3], "status": row[4], "date_completed": row[5],
+                    "urgency": row[6], "VIN": row[7], "make": row[8], "model": row[9],
+                    "mileage": row[10], "assigned_engineer_id": row[11], "engineer_name": row[12],
+                    "engineer_level": row[13], "time_started": row[14], "time_ended": row[15],
+                    "time_taken": row[16], "estimated_standard_time": row[17], "outcome_score": row[18],
+                    "dynamic_estimated_time": row[19], "suitability_score": row[20]
+                }
+                for row in rows
+            ]
+            
+            jobs = sanitize_jobs(job_history)
+            return jsonify(jobs), 200
 
+    except sqlite3.Error as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@app.route("/api/v1/jobs/<string:job_id>/start-all-tasks", methods=["POST"])
+def start_all_tasks(job_id):
+    """Start all eligible tasks for a specific job."""
+    try:
+        data = request.get_json()
+        time_started = data.get('time_started')
+        
+        # Validation
+        if not time_started:
+            return jsonify({'error': 'time_started is required'}), 400
+            
         try:
-            recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
-            recommendation_reason = reason # Store the reason for this task
-            if isinstance(recommendations, str):
-                status = f"Failed: Recommendation system error - {recommendations}"
-            else:
-                engineer_assigned, engineer_score = recommendations
-                if engineer_assigned and engineer_score:
-                    update_task_assignment(task_id, job_card_id, engineer_assigned, engineer_score) # Use new update_task_assignment
-                    mark_engineer_unavailable(engineer_assigned)
-                    status = "Assigned"
-                    _, dynamic_estimated_time = get_dynamic_task_estimate(task_id, engineer_assigned)
-                    save_dynamic_estimated_time(task_id, job_card_id, dynamic_estimated_time)
-                    if engineer_score is None:
-                        engineer_score = "N/A"  # Handle case where score is not provided
-                else:
-                    status = "Failed: No available engineer found in recommendations"
+            parsed_time = datetime.strptime(time_started, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            return jsonify({'error': 'Invalid time format. Use YYYY-MM-DD HH:MM:SS'}), 400
+        
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if job exists
+            cursor.execute("SELECT COUNT(*) FROM job_card WHERE Job_Id = ?", (job_id,))
+            if cursor.fetchone()[0] == 0:
+                return jsonify({'error': 'Job not found'}), 404
+            
+            # Only update tasks that can be started (not already completed or in progress)
+            cursor.execute("""
+                UPDATE job_card 
+                SET Status = 'In Progress', Time_Started = ?
+                WHERE Job_Id = ? AND Status = 'Assigned'
+            """, (parsed_time, job_id))
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'No eligible tasks to start. All tasks may already be in progress or completed.'}), 400
+            
+            conn.commit()
+            
+            return jsonify({
+                "message": f"Started {cursor.rowcount} tasks successfully",
+                "job_id": job_id,
+                "tasks_started": cursor.rowcount
+            }), 200
+            
+    except sqlite3.Error as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
-        except Exception as e:
-            status = f"Failed: Unexpected error during assignment - {str(e)}"
-            print(f"Error assigning engineer to task {task_id}: {e}") # Log error on backend
 
-        assignment_results.append({
-            "task_id": task_id,
+# =============================================================================
+# TASK MANAGEMENT ROUTES
+# =============================================================================
+
+@app.route("/api/v1/task/assign-engineer", methods=["POST"])
+def assign_engineer_to_task():
+    """Assign an engineer to a specific task."""
+    try:
+        data = request.get_json()
+        job_card_id = data.get("job_card_id")
+        task_id = data.get("task_id")
+
+        if not job_card_id or not task_id:
+            return jsonify({"message": "Missing job_card_id or task_id"}), 400
+
+        # Get recommendations for the task
+        recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
+        
+        if isinstance(recommendations, str):
+            return jsonify({"message": f"Recommendation system error: {recommendations}"}), 500
+
+        if recommendations is None or recommendations == ():
+            return jsonify({"message": f"No engineers available for task {task_id}"}), 404
+
+        engineer_assigned, engineer_score = recommendations
+        
+        if not engineer_assigned or not engineer_score:
+            return jsonify({"message": "No available engineer found in recommendations"}), 404
+
+        # Update the task assignment
+        update_task_assignment(task_id, job_card_id, engineer_assigned, engineer_score)
+        
+        # Mark the engineer as unavailable
+        mark_engineer_unavailable(engineer_assigned)
+
+        # Get dynamic estimated time for the task
+        _, dynamic_estimated_time = get_dynamic_task_estimate(task_id, engineer_assigned)
+        save_dynamic_estimated_time(task_id, job_card_id, dynamic_estimated_time)
+        return jsonify({
+            "message": f"Engineer {engineer_assigned} assigned to task {task_id} for job {job_card_id}",
             "engineer_assigned": engineer_assigned,
             "suitability_score": safe_float(engineer_score),
-            "status": status,
-            "recommendation_reason": recommendation_reason,
-            "dynamic_estimated_time": dynamic_estimated_time
-        })
+            "dynamic_estimated_time": dynamic_estimated_time,
+            "recommendation_reason": reason
+        }), 200
+    except Exception as e:
+        print(f"Error assigning engineer to task {task_id}: {e}")
+        return jsonify({'message': 'Failed to assign engineer to task'}), 500
 
-    # Return a summary of all assignments
-    return jsonify(
-        {
+@app.route("/api/v1/jobs/assign-all-tasks", methods=["POST"])
+def assign_engineer_to_all_tasks_for_job():
+    """Assign engineers to all tasks for a specific job."""
+    try:
+        data = request.get_json()
+        job_card_id = data.get("job_card_id")
+
+        if not job_card_id:
+            return jsonify({"error": "Missing job_card_id"}), 400
+
+        # Get all task IDs for this job
+        task_ids = get_task_ids_for_job(job_card_id)
+        if not task_ids:
+            return jsonify({"error": f"No tasks found for Job_Card_ID {job_card_id}"}), 404
+
+        assignment_results = []
+        
+        # Process each task
+        for task_id in task_ids:
+            engineer_assigned = None
+            engineer_score = None
+            dynamic_estimated_time = None
+            recommendation_reason = "No recommendation provided"
+            status = "Failed: No available engineer"
+
+            try:
+                recommendations, reason = recommend_engineers_memory_cf(task_id, top_n=5)
+                recommendation_reason = reason
+                
+                if isinstance(recommendations, str):
+                    status = f"Failed: Recommendation system error - {recommendations}"
+                else:
+                    engineer_assigned, engineer_score = recommendations
+                    if engineer_assigned and engineer_score:
+                        update_task_assignment(task_id, job_card_id, engineer_assigned, engineer_score)
+                        mark_engineer_unavailable(engineer_assigned)
+                        status = "Assigned"
+                        _, dynamic_estimated_time = get_dynamic_task_estimate(task_id, engineer_assigned)
+                        save_dynamic_estimated_time(task_id, job_card_id, dynamic_estimated_time)
+                        if engineer_score is None:
+                            engineer_score = "N/A"
+                    else:
+                        status = "Failed: No available engineer found in recommendations"
+
+            except Exception as e:
+                status = f"Failed: Unexpected error during assignment - {str(e)}"
+                print(f"Error assigning engineer to task {task_id}: {e}")
+
+            assignment_results.append({
+                "task_id": task_id,
+                "engineer_assigned": engineer_assigned,
+                "suitability_score": safe_float(engineer_score),
+                "status": status,
+                "recommendation_reason": recommendation_reason,
+                "dynamic_estimated_time": dynamic_estimated_time
+            })
+
+        return jsonify({
             "message": f"Assignment process completed for Job {job_card_id}",
             "assignments": assignment_results
-        }
-    ), 200
-
+        }), 200
+    except Exception as e:
+        print(f"Error in task assignment: {e}")
+        return jsonify({'error': 'Failed to assign tasks'}), 500
 
 @app.route('/api/v1/jobs/start-task', methods=['POST'])
 def start_task():
-    """
-    Starts a task by updating its status to 'In Progress' and setting the start time.
-    """
-    data = request.get_json()
-    job_id = data.get('job_id')
-    task_id = data.get('task_id')
-    time_started = data.get('time_started')
+    """Start a task by updating its status to 'In Progress' and setting the start time."""
+    try:
+        data = request.get_json()
+        job_id = data.get('job_id')
+        task_id = data.get('task_id')
+        time_started = data.get('time_started')
 
-    if not job_id or not task_id:
-        return jsonify({'error': 'Missing job_id or task_id'}), 400
+        if not job_id or not task_id:
+            return jsonify({'error': 'Missing job_id or task_id'}), 400
 
-    with get_connection() as conn:
-        conn.row_factory = sqlite3.Row  # Allows accessing columns by name
-        cursor = conn.cursor()
+        with get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        try:
-            # First, check the task's current status
+            # Check current task status
             cursor.execute("SELECT Status FROM job_card WHERE Job_Id = ? AND Task_Id = ?", (job_id, task_id))
             task_record = cursor.fetchone()
 
             if not task_record:
                 return jsonify({'error': 'Task not found'}), 404
             
-            # A task can only be started if it's 'Assigned' (not 'Pending')
             if task_record['Status'] != 'Assigned':
                 return jsonify({'error': f"Task cannot be started. Status is currently '{task_record['Status']}'"}), 409
 
-            # Set the start time and update the status
-            # time_started = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # Update task to 'In Progress'
             parsed_time = datetime.strptime(time_started, '%Y-%m-%d %H:%M:%S')
             cursor.execute("""
                 UPDATE job_card 
@@ -406,30 +628,29 @@ def start_task():
 
             return jsonify({'message': f'Task {task_id} started successfully'}), 200
 
-        except sqlite3.Error as e:
-            conn.rollback()
-            return jsonify({'error': str(e)}), 500
+    except sqlite3.Error as e:
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Error starting task: {e}")
+        return jsonify({'error': 'Failed to start task'}), 500
 
 @app.route('/api/v1/jobs/mark-complete', methods=['POST'])
 def mark_task_complete():
-    """
-    Moves a completed task from the job_card table to the job_history table.
-    """
-    data = request.get_json()
-    job_id = data.get('job_id')
-    task_id = data.get('task_id')
-    outcome_score = data.get('outcome_score')
+    """Move a completed task from the job_card table to the job_history table."""
+    try:
+        data = request.get_json()
+        job_id = data.get('job_id')
+        task_id = data.get('task_id')
+        outcome_score = data.get('outcome_score')
 
-    if not job_id or not task_id or outcome_score is None:
-        return jsonify({'error': 'Missing job_id, task_id, or outcome_score'}), 400
+        if not job_id or not task_id or outcome_score is None:
+            return jsonify({'error': 'Missing job_id, task_id, or outcome_score'}), 400
 
-    # This single 'with' block manages the entire transaction
-    with get_connection() as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        try:
-            # Fetch the full record from job_card
+            # Fetch the complete record from job_card
             cursor.execute("SELECT * FROM job_card WHERE Job_Id = ? AND Task_Id = ?", (job_id, task_id))
             record = cursor.fetchone()
 
@@ -439,11 +660,12 @@ def mark_task_complete():
             if not record['Time_Started']:
                 return jsonify({'error': 'Cannot complete a task that has not been started'}), 400
 
-            # --- Calculate Times ---
+            # Calculate completion time
             time_ended_dt = datetime.now()
             time_started_dt = datetime.strptime(record['Time_Started'], '%Y-%m-%d %H:%M:%S')
             time_taken = int((time_ended_dt - time_started_dt).total_seconds() / 60)
 
+            # Insert into job_history
             cursor.execute("""
                 INSERT INTO job_history (
                     Job_ID, Job_Name, Task_Id, Task_Description, Status, Date_Completed, Urgency, VIN, Make, Model, Mileage, 
@@ -455,74 +677,55 @@ def mark_task_complete():
                 time_ended_dt.strftime('%Y-%m-%d %H:%M:%S'), record['Urgency'], record['VIN'], record['Make'],
                 record['Model'], record['Mileage'], record['Engineer_Id'], record['Engineer_Name'],
                 record['Engineer_Level'], record['Time_Started'], time_ended_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                time_taken, record['Estimated_Standard_Time'], outcome_score, record['Suitability_Score'], record['Dynamic_Estimated_Time']
+                time_taken, record['Estimated_Standard_Time'], outcome_score, record['Suitability_Score'], 
+                record['Dynamic_Estimated_Time']
             ))
 
-            # --- Delete from job_card ---
+            # Remove from active jobs
             cursor.execute("DELETE FROM job_card WHERE Job_Id = ? AND Task_Id = ?", (job_id, task_id))
 
-            # --- Make the engineer available again USING THE SAME CONNECTION ---
+            # Make engineer available again
             if record['Engineer_Id']:
-                # Pass the existing 'conn' object to the helper function
                 mark_engineer_available(conn, record['Engineer_Id'])
 
-            # Commit the entire transaction at the very end
             conn.commit()
             return jsonify({'message': 'Task marked as complete and moved to history'}), 200
 
-        except sqlite3.Error as e:
-            conn.rollback() # If anything fails, roll back all changes
-            return jsonify({'error': str(e)}), 500
-
-
-@app.route("/api/v1/job-history", methods=["GET"])
-def get_job_history():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM job_history")
-        rows = cursor.fetchall()
-        job_history = [
-            {
-                "job_id": row[0],
-                "job_name": row[1],
-                "task_id": row[2],
-                "task_description": row[3],
-                "status": row[4],
-                "date_completed": row[5],
-                "urgency": row[6],
-                "VIN"  : row[7],
-                "make": row[8],
-                "model": row[9],
-                "mileage": row[10],
-                "assigned_engineer_id": row[11],
-                "engineer_name": row[12],
-                "engineer_level": row[13],
-                "time_started": row[14],
-                "time_ended": row[15],
-                "time_taken": row[16],
-                "estimated_standard_time": row[17],
-                "outcome_score": row[18],
-                "dynamic_estimated_time": row[19],
-                "suitability_score": row[20]
-            }
-            for row in rows
-        ]
-        jobs = sanitize_jobs(job_history)
-        return jsonify(jobs), 200
-
     except sqlite3.Error as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Error completing task: {e}")
+        return jsonify({'error': 'Failed to complete task'}), 500
 
-    finally:
-        if conn:
-            conn.close()
+# =============================================================================
+# SERVICE MAPPING ROUTES
+# =============================================================================
 
-@app.route("/api/v1/reset-database", methods=["GET","POST"])
+@app.route('/api/v1/mapping-services', methods=['POST'])
+def select_services():
+    """Get matching services based on user description using AI mapping."""
+    try:
+        data = request.get_json()
+        user_input = data.get('description')
+
+        if not user_input:
+            return jsonify({"error": "Description is required"}), 400
+        
+        services = get_matching_services(user_input)
+        return jsonify({"services": services}), 200
+    except Exception as e:
+        print(f"Error in service mapping: {e}")
+        return jsonify({"error": "Failed to map services"}), 500
+
+# =============================================================================
+# ADMIN & UTILITY ROUTES
+# =============================================================================
+
+@app.route("/api/v1/reset-database", methods=["GET", "POST"])
 def reset_database():
     """
-    Resets the database by deleting all records from job_card and job_history.
-    This is a destructive operation, so it should be used with caution.
+    Reset the database by clearing job_card and job_history tables.
+    WARNING: This is a destructive operation!
     """
     try:
         with get_connection() as conn:
@@ -538,6 +741,9 @@ def reset_database():
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 500
 
+# =============================================================================
+# APPLICATION ENTRY POINT
+# =============================================================================
 
 if __name__ == "__main__":
-    app.run(debug=True,  use_reloader=False, threaded=False)
+    app.run(debug=True, use_reloader=False, threaded=False)

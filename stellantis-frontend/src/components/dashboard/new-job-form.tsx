@@ -48,6 +48,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "../ui/textarea";
 import { getTaskIdsFromNames } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 type NewJobFormValues = z.infer<typeof newJobFormSchema>;
 
@@ -65,6 +66,7 @@ const jobTypeToTaskNames: Record<(typeof JOB_TYPES)[number], string[]> = {
 };
 
 export function NewJobForm() {
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMapping, setIsMapping] = useState(false);
   const [aiSuggestedTasks, setAiSuggestedTasks] = useState<string[]>([]);
@@ -242,11 +244,12 @@ export function NewJobForm() {
       const successes = assignmentSummary.assignments.filter(
         (a) => a.status === "Assigned",
       ).length;
-      console.log(successes, assignmentSummary.assignments);
       const failures = assignmentSummary.assignments.length - successes;
 
       if (failures === 0) {
         toast.success(`All ${successes} tasks have been assigned an engineer.`);
+      } else if (successes === 0) {
+        toast.error(`No tasks could be assigned to engineers.`);
       } else {
         toast.warning(
           `${successes} tasks were assigned, but ${failures} could not be assigned.`,
@@ -255,6 +258,7 @@ export function NewJobForm() {
 
       form.reset();
       setSelectedJobType("Custom Service");
+      router.push(`/dashboard/jobs?job=${generatedJobId}`);
     } catch (error) {
       console.error(
         "An error occurred during the job creation/assignment process:",

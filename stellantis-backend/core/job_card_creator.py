@@ -124,8 +124,6 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
     finally:
         if conn:
             conn.close()
-    
-
 
 if __name__ == '__main__':
     # This simulates the data coming from the UI form

@@ -179,9 +179,7 @@ def recommend_engineers_memory_cf(task_id, top_n=5):
 
     if available_perf_series.empty:
         # No available engineers, return failure
-        return [], f"No available engineers found for task {task_id}."
-
-    # Else - multiple engineers available - proceed with normal scoring
+        return (), f"No available engineers found for task {task_id}."
 
     placeholders = ",".join("?" for _ in available_perf_series)
     sql = f"SELECT Engineer_ID, Years_of_Experience, Customer_Rating, Avg_Job_Completion_Time, Specialization FROM engineer_profiles WHERE Engineer_ID IN ({placeholders})"

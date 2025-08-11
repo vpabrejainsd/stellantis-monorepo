@@ -177,7 +177,7 @@ def get_task_ids_for_job(job_card_id): # Renamed for clarity: plural 'ids'
     """
     with get_connection() as conn: # Using 'with' is good practice for connection management
         cursor = conn.execute(
-            "SELECT Task_Id FROM job_card WHERE Job_Id = ?", (job_card_id,)) # Ensure table name is 'job_card'
+            "SELECT Task_Id FROM job_card WHERE Job_Id = ? AND Status = 'Pending'", (job_card_id,)) # Ensure table name is 'job_card'
         # Fetch all rows, and extract just the Task_ID from each row
         task_ids = [row[0] for row in cursor.fetchall()] 
         return task_ids

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// src/app/dashboard/page.tsx
 "use client";
 
 import * as React from "react";
@@ -34,7 +33,6 @@ import {
 } from "date-fns";
 import type { EngineerProfile, JobTask, JobHistoryTask } from "@/lib/types";
 import { ActiveTasksTable } from "./tables/active-tasks-table";
-import { Car } from "lucide-react";
 
 // --- Theme Colors ---
 const PRIMARY = "hsl(227, 57%, 33%)";
