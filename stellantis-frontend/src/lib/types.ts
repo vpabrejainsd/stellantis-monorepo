@@ -1,6 +1,5 @@
 // src/lib/types.ts
 
-// EngineerProfile matches your database schema
 export interface EngineerProfile {
   Engineer_ID: string;
   Engineer_Name: string;
@@ -213,4 +212,94 @@ export interface EstimateDetails {
     task_id: string;
   }>;
   Total_Estimate_Minutes: number;
+}
+
+export interface User {
+  id: number;
+  clerk_user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  created_at: string;
+  manager_id: string | null;
+  engineer_id: string | null;
+  role: "engineer" | "manager";
+}
+
+export interface EngineerDashboardResponse {
+  engineer_profile: EngineerDashboardProfile;
+  active_tasks: EngineerActiveTask[];
+  completed_tasks: EngineerCompletedTask[];
+  todays_stats: EngineerTodayStats;
+  performance_trend: EngineerPerformanceTrend[];
+}
+
+// Simplified engineer profile for dashboard (subset of EngineerProfile)
+export interface EngineerDashboardProfile {
+  engineer_id: string;
+  name: string;
+  availability: string;
+  experience: number;
+  specialization: string;
+  customer_rating: number;
+  avg_completion_time: number;
+  overall_performance_score: number;
+}
+
+// Active task structure for engineer dashboard (simplified JobTask)
+export interface EngineerActiveTask {
+  job_id: string;
+  job_name: string;
+  task_id: string;
+  task_description: string;
+  status: "Pending" | "Assigned" | "In Progress";
+  date_created: string;
+  urgency: string;
+  vin: string;
+  make: string;
+  model: string;
+  estimated_time: number;
+  suitability_score: number | null;
+}
+
+// Completed task structure for engineer dashboard (simplified JobHistoryTask)
+export interface EngineerCompletedTask {
+  job_id: string;
+  task_description: string;
+  date_completed: string;
+  time_taken: number;
+  outcome_score: number;
+  estimated_time: number;
+}
+
+// Today's statistics for engineer
+export interface EngineerTodayStats {
+  completed_count: number;
+  avg_outcome_score: number;
+  total_time_spent: number;
+}
+
+// Performance trend data for charts
+export interface EngineerPerformanceTrend {
+  date: string;
+  completed: number;
+  avg_time: number;
+  avg_score: number;
+}
+
+// Chart data types for the dashboard
+export interface TaskStatusChart {
+  status: string;
+  count: number;
+}
+
+export interface TaskUrgencyChart {
+  urgency: string;
+  count: number;
+}
+
+export interface PerformanceChartData {
+  date: string;
+  completed: number;
+  avgScore: number;
 }

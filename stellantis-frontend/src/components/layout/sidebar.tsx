@@ -9,6 +9,8 @@ import {
   Wrench,
   Package,
   type LucideIcon,
+  LayoutList,
+  User,
 } from "lucide-react";
 
 import {
@@ -35,9 +37,23 @@ const managerNavItems: NavItem[] = [
   { href: "/dashboard/engineers", label: "Engineers", icon: Wrench },
 ];
 
-export default function AppSidebar() {
+export default function AppSidebar({
+  userRole,
+  engineerId,
+}: {
+  userRole: "manager" | "engineer";
+  engineerId: string;
+}) {
+  const engineerNavItems: NavItem[] = [
+    { href: "/dashboard", label: "Overview", icon: Home },
+    {
+      href: `/dashboard/engineers/${engineerId}`,
+      label: "Profile",
+      icon: User,
+    },
+  ];
   const pathname = usePathname();
-  const navItems = managerNavItems;
+  const navItems = userRole === "manager" ? managerNavItems : engineerNavItems;
 
   // Consume the state from the provider
   const { open } = useSidebar();

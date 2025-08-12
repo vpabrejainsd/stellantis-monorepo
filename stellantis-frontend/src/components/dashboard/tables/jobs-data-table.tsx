@@ -143,7 +143,7 @@ const JobsDataTable = () => {
         cell: ({ row }) => {
           const job = row.original;
 
-          const handleAssign = async (jobId: string) => {
+          const handleAssign = async () => {
             // Your assign logic
             await fetchAndProcessData();
           };
