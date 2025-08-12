@@ -6,6 +6,9 @@ from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 import pandas as pd
 
+import os
+from svix.webhooks import Webhook, WebhookVerificationError
+
 # Core business logic imports
 from utils.helpers import safe_float, sanitize_jobs
 from core.dynamic_estimator import get_dynamic_job_estimate, get_dynamic_task_estimate
@@ -30,6 +33,95 @@ CORS(app)
 
 # Configuration
 DB_PATH = "database/workshop.db"
+
+# =============================================================================
+# USER MANAGEMENT ROUTES
+# =============================================================================
+
+@app.route('/api/v1/webhooks/clerk', methods=['POST'])
+def clerk_webhook():
+    try:
+        # Get the webhook payload and headers
+        payload = request.get_data()
+        headers = request.headers
+        
+        # Verify the webhook signature
+        webhook_secret = os.environ.get('CLERK_WEBHOOK_SIGNING_SECRET')
+        wh = Webhook(webhook_secret)
+        
+        # Verify and parse the webhook
+        evt = wh.verify(payload, headers)
+        
+        # Handle different event types
+        event_type = evt['type']
+        
+        if event_type == 'user.created':
+            user_data = evt['data']
+            user_id = user_data['id']
+            
+            # Extract user information
+            first_name = user_data.get('first_name', '')
+            last_name = user_data.get('last_name', '')
+            email = user_data['email_addresses'][0]['email_address'] if user_data['email_addresses'] else ''
+            
+            # Create user in your database
+            create_user_in_db(user_id, first_name, last_name, email)
+            
+            print(f"User {user_id} created successfully in database")
+        
+        return jsonify({'status': 'success'}), 200
+        
+    except WebhookVerificationError:
+        return jsonify({'error': 'Invalid webhook signature'}), 400
+    except Exception as e:
+        print(f"Error processing webhook: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+def create_user_in_db(clerk_user_id, first_name, last_name, email):
+    # Use absolute path for SQLite database
+    db_path = DB_PATH
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+        SELECT Engineer_ID FROM engineer_profiles 
+        WHERE Engineer_Name = ? OR Engineer_ID = ?
+    ''', (f"{first_name} {last_name}", email))
+
+        engineer_match = cursor.fetchone()
+        engineer_id = engineer_match[0] if engineer_match else None
+        
+        cursor.execute('''
+        INSERT INTO users (clerk_user_id, first_name, last_name, email, created_at, engineer_id, manager_id)
+        VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
+    ''', (clerk_user_id, first_name, last_name, email, engineer_id, 2))
+        
+        conn.commit()
+        print(f"User {clerk_user_id} added to database")
+        
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+@app.route('/api/v1/users/<string:user_id>', methods=['GET'])
+def get_user_profile(user_id):
+    try:
+        with get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users WHERE clerk_user_id = ?', (user_id,))
+            user = cursor.fetchone()
+            if user:
+                return jsonify(dict(user)), 200
+            else:
+                print("not found")
+                return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        print(f"Error fetching user profile {user_id}: {e}")
+        return jsonify({'error': 'An internal server error occurred'}), 500
 
 # =============================================================================
 # ENGINEER MANAGEMENT ROUTES
@@ -122,6 +214,116 @@ def get_engineer_details(engineer_id):
     except Exception as e:
         print(f"Error fetching details for engineer {engineer_id}: {e}")
         return jsonify({'error': 'An internal server error occurred'}), 500
+
+@app.route('/api/v1/engineer-dashboard/<string:engineer_id>', methods=['GET'])
+def get_engineer_dashboard(engineer_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Get engineer profile
+        cursor.execute('''
+            SELECT * FROM engineer_profiles WHERE Engineer_ID = ?
+        ''', (engineer_id,))
+        engineer_profile = cursor.fetchone()
+        
+        # Get engineer's active tasks
+        cursor.execute('''
+            SELECT * FROM job_card WHERE Engineer_Id = ? AND Status != 'Completed'
+            ORDER BY Date_Created DESC
+        ''', (engineer_id,))
+        active_tasks = cursor.fetchall()
+        
+        # Get engineer's completed tasks (last 30 days)
+        cursor.execute('''
+            SELECT * FROM job_history 
+            WHERE Engineer_Id = ? 
+            AND Date_Completed >= datetime('now', '-30 days')
+            ORDER BY Date_Completed DESC
+        ''', (engineer_id,))
+        completed_tasks = cursor.fetchall()
+        
+        # Get today's completed tasks
+        cursor.execute('''
+            SELECT * FROM job_history 
+            WHERE Engineer_Id = ? 
+            AND date(Date_Completed) = date('now')
+        ''', (engineer_id,))
+        todays_completed = cursor.fetchall()
+        
+        # Get engineer's performance data (last 7 days)
+        cursor.execute('''
+            SELECT Date_Completed, COUNT(*) as completed_count,
+                   AVG(Time_Taken_minutes) as avg_time,
+                   AVG(Outcome_Score) as avg_score
+            FROM job_history 
+            WHERE Engineer_Id = ? 
+            AND Date_Completed >= datetime('now', '-7 days')
+            GROUP BY date(Date_Completed)
+            ORDER BY Date_Completed
+        ''', (engineer_id,))
+        performance_data = cursor.fetchall()
+        
+        # Format the response
+        response = {
+            'engineer_profile': {
+                'engineer_id': engineer_profile[0] if engineer_profile else engineer_id,
+                'name': engineer_profile[1] if engineer_profile else 'Unknown',
+                'availability': engineer_profile[2] if engineer_profile else 'Available',
+                'experience': engineer_profile[3] if engineer_profile else 0,
+                'specialization': engineer_profile[4] if engineer_profile else 'General',
+                'customer_rating': engineer_profile[7] if engineer_profile else 0,
+                'avg_completion_time': engineer_profile[6] if engineer_profile else 0,
+                'overall_performance_score': engineer_profile[-1] if engineer_profile else 0
+            },
+            'active_tasks': [
+                {
+                    'job_id': task[0],
+                    'job_name': task[1],
+                    'task_id': task[2],
+                    'task_description': task[3],
+                    'status': task[4],
+                    'date_created': task[5],
+                    'urgency': task[6],
+                    'vin': task[7],
+                    'make': task[8],
+                    'model': task[9],
+                    'estimated_time': task[15],
+                    'suitability_score': task[16]
+                } for task in active_tasks
+            ],
+            'completed_tasks': [
+                {
+                    'job_id': task[0],
+                    'task_description': task[3],
+                    'date_completed': task[5],
+                    'time_taken': task[16],
+                    'outcome_score': task[17],
+                    'estimated_time': task[15]
+                } for task in completed_tasks
+            ],
+            'todays_stats': {
+                'completed_count': len(todays_completed),
+                'avg_outcome_score': sum(task[17] for task in todays_completed if task[17]) / len(todays_completed) if todays_completed else 0,
+                'total_time_spent': sum(task[16] for task in todays_completed if task[16]) if todays_completed else 0
+            },
+            'performance_trend': [
+                {
+                    'date': perf[0],
+                    'completed': perf[1],
+                    'avg_time': perf[2],
+                    'avg_score': perf[3]
+                } for perf in performance_data
+            ]
+        }
+        
+        return jsonify(response), 200
+        
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return jsonify({'error': 'Database error'}), 500
+    finally:
+        conn.close()
 
 # =============================================================================
 # JOB MANAGEMENT ROUTES
@@ -746,4 +948,4 @@ def reset_database():
 # =============================================================================
 
 if __name__ == "__main__":
-    app.run(debug=True, use_reloader=False, threaded=False)
+    app.run(debug=True, use_reloader=False, threaded=False, port=4001)

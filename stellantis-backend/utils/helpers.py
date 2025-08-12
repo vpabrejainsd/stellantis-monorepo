@@ -1,4 +1,6 @@
 import math
+import os
+import sqlite3
 
 def safe_float(val):
     if isinstance(val, float) and math.isnan(val):
@@ -17,3 +19,25 @@ def sanitize_jobs(jobs):
             elif isinstance(value, str) and value.lower() == 'nan':
                 job[key] = "null"
     return jobs
+
+def create_user_in_db(clerk_user_id, first_name, last_name, email):
+    # Use absolute path for SQLite database
+    db_path = os.path.join(os.path.dirname(__file__), 'workshop.db')
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            INSERT INTO users (clerk_user_id, first_name, last_name, email, created_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+        ''', (clerk_user_id, first_name, last_name, email))
+        
+        conn.commit()
+        print(f"User {clerk_user_id} added to database")
+        
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
