@@ -23,6 +23,7 @@ import {
   useSidebar, // Import useSidebar hook
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 // ... (NavItem and navItems arrays remain the same) ...
 interface NavItem {
@@ -71,9 +72,19 @@ export default function AppSidebar({
       )}
     >
       <SidebarHeader>
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <Wrench className="h-6 w-6 shrink-0" />
-          <span className="text-lg">Stellantis Garage</span>
+        <Link
+          href="/"
+          className="flex h-16 w-full items-center gap-2 font-semibold"
+        >
+          {/* <Wrench className="h-6 w-6 shrink-0" />
+          <span className="text-lg">Stellantis Garage</span> */}
+          <Image
+            src={"/stellantis-banner.jpg"}
+            alt="Stellantis Garage"
+            width={1000}
+            height={600}
+            className="h-auto w-full object-cover"
+          />
         </Link>
       </SidebarHeader>
 

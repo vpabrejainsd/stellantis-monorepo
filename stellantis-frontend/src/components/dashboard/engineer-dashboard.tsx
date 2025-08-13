@@ -160,8 +160,8 @@ function MyTasksTable({
     return (
       <div className="text-muted-foreground py-8 text-center">
         <Target className="mx-auto mb-2 h-12 w-12 opacity-50" />
-        <p>No active tasks assigned to you</p>
-        <p className="text-xs">New tasks will appear here when assigned</p>
+        <p>No active task assigned to you</p>
+        <p className="text-xs">New task will appear here when assigned</p>
       </div>
     );
   }
@@ -294,7 +294,7 @@ function RecentCompletedTasks({ tasks }: { tasks: EngineerCompletedTask[] }) {
             </div>
             <div className="text-muted-foreground flex items-center gap-1">
               <Star className="h-3 w-3" />
-              {task.outcome_score}/10
+              {task.outcome_score}/5
             </div>
           </div>
         </div>
@@ -410,19 +410,19 @@ export default function EngineerDashboard() {
     performance_trend,
   } = data;
 
-  const tasksByStatus: TaskStatusChart[] = Object.entries(
-    active_tasks.reduce((acc: Record<string, number>, task) => {
-      acc[task.status] = (acc[task.status] ?? 0) + 1;
-      return acc;
-    }, {}),
-  ).map(([status, count]) => ({ status, count }));
+  // const tasksByStatus: TaskStatusChart[] = Object.entries(
+  //   active_tasks.reduce((acc: Record<string, number>, task) => {
+  //     acc[task.status] = (acc[task.status] ?? 0) + 1;
+  //     return acc;
+  //   }, {}),
+  // ).map(([status, count]) => ({ status, count }));
 
-  const tasksByUrgency: TaskUrgencyChart[] = Object.entries(
-    active_tasks.reduce((acc: Record<string, number>, task) => {
-      acc[task.urgency] = (acc[task.urgency] ?? 0) + 1;
-      return acc;
-    }, {}),
-  ).map(([urgency, count]) => ({ urgency, count }));
+  // const tasksByUrgency: TaskUrgencyChart[] = Object.entries(
+  //   active_tasks.reduce((acc: Record<string, number>, task) => {
+  //     acc[task.urgency] = (acc[task.urgency] ?? 0) + 1;
+  //     return acc;
+  //   }, {}),
+  // ).map(([urgency, count]) => ({ urgency, count }));
 
   // Performance trend for last 7 days
   const last7Days = Array.from({ length: 7 }).map((_, i) =>
@@ -521,79 +521,18 @@ export default function EngineerDashboard() {
           icon={Star}
         />
       </div>
+      {/* Tasks Section */}
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* My Tasks by Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle>My Tasks by Status</CardTitle>
-            <CardDescription>
-              Current breakdown of your assigned tasks
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {tasksByStatus.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={tasksByStatus}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="status" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill={PRIMARY}>
-                    {tasksByStatus.map((entry, idx) => (
-                      <Cell
-                        key={`cell-${idx}`}
-                        fill={STATUS_COLORS[entry.status]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-muted-foreground py-8 text-center">
-                <Target className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                <p>No active tasks</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* My Tasks by Urgency */}
-        <Card>
-          <CardHeader>
-            <CardTitle>My Tasks by Urgency</CardTitle>
-            <CardDescription>
-              Priority breakdown of your current workload
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {tasksByUrgency.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={tasksByUrgency}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="urgency" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill={PRIMARY}>
-                    {tasksByUrgency.map((entry, idx) => (
-                      <Cell
-                        key={`cell-${idx}`}
-                        fill={URGENCY_COLORS[entry.urgency]}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-muted-foreground py-8 text-center">
-                <AlertCircle className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                <p>No active tasks</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* My Active Tasks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>My Active Task</CardTitle>
+          <CardDescription>Task currently assigned to you</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MyTasksTable tasks={active_tasks} onTaskUpdate={refetch} />
+        </CardContent>
+      </Card>
 
       {/* Performance Trend */}
       <Card>
@@ -630,31 +569,16 @@ export default function EngineerDashboard() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-
-      {/* Tasks Section */}
-      <div className="grid grid-cols-1 gap-8">
-        {/* My Active Tasks */}
-        <Card>
-          <CardHeader>
-            <CardTitle>My Active Tasks</CardTitle>
-            <CardDescription>Tasks currently assigned to you</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MyTasksTable tasks={active_tasks} onTaskUpdate={refetch} />
-          </CardContent>
-        </Card>
-
-        {/* Recent Completed Tasks */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recently Completed</CardTitle>
-            <CardDescription>Your last 5 completed tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecentCompletedTasks tasks={completed_tasks} />
-          </CardContent>
-        </Card>
-      </div>
+      {/* Recent Completed Tasks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recently Completed</CardTitle>
+          <CardDescription>Your last 5 completed tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RecentCompletedTasks tasks={completed_tasks} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

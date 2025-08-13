@@ -99,7 +99,7 @@ def create_user_in_db(clerk_user_id, first_name, last_name, email):
         
         conn.commit()
         print(f"User {clerk_user_id} added to database")
-        
+      
     except sqlite3.Error as e:
         print(f"Database error: {e}")
         conn.rollback()
@@ -298,7 +298,7 @@ def get_engineer_dashboard(engineer_id):
                     'task_description': task[3],
                     'date_completed': task[5],
                     'time_taken': task[16],
-                    'outcome_score': task[17],
+                    'outcome_score': task[18],
                     'estimated_time': task[15]
                 } for task in completed_tasks
             ],
