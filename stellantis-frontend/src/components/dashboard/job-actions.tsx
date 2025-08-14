@@ -41,7 +41,8 @@ export function JobActionDropdown({
   const assignDisabled =
     job.completedTasks >= job.totalTasks ||
     job.derivedCompletionStatus === "Completed" ||
-    job.totalTasks === 0; // No tasks to assign
+    job.totalTasks === 0 ||
+    job.tasks.filter((t) => t.Status === "Pending").length === 0; // No tasks to assign
 
   const startAllTasksDisabled = job.completedTasks >= job.totalTasks;
   const handleEdit = async (updatedJobData: Partial<Job>) => {
@@ -219,7 +220,7 @@ export function JobActionDropdown({
               }
             }}
             className={
-              assignDisabled || isAssigning
+              startAllTasksDisabled
                 ? "cursor-not-allowed text-gray-400 opacity-50"
                 : "cursor-pointer"
             }
