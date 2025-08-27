@@ -9,7 +9,8 @@ import {
   Wrench,
   Package,
   type LucideIcon,
-  CalendarClock,
+  LayoutList,
+  User,
 } from "lucide-react";
 
 import {
@@ -19,10 +20,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter,
   useSidebar, // Import useSidebar hook
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 // ... (NavItem and navItems arrays remain the same) ...
 interface NavItem {
@@ -37,16 +38,26 @@ const managerNavItems: NavItem[] = [
   { href: "/dashboard/engineers", label: "Engineers", icon: Wrench },
 ];
 
-interface AppSidebarProps {
-  userRole: string;
-}
-
-export default function AppSidebar({ userRole }: AppSidebarProps) {
+export default function AppSidebar({
+  userRole,
+  engineerId,
+}: {
+  userRole: "manager" | "engineer";
+  engineerId: string;
+}) {
+  const engineerNavItems: NavItem[] = [
+    { href: "/dashboard", label: "Overview", icon: Home },
+    {
+      href: `/dashboard/engineers/${engineerId}`,
+      label: "Profile",
+      icon: User,
+    },
+  ];
   const pathname = usePathname();
-  const navItems = managerNavItems;
+  const navItems = userRole === "manager" ? managerNavItems : engineerNavItems;
 
   // Consume the state from the provider
-  const { open, toggleSidebar } = useSidebar();
+  const { open } = useSidebar();
 
   return (
     // Remove variant="floating". The sidebar is now part of the document flow.
@@ -61,9 +72,19 @@ export default function AppSidebar({ userRole }: AppSidebarProps) {
       )}
     >
       <SidebarHeader>
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <Wrench className="h-6 w-6 shrink-0" />
-          {open && <span className="text-lg">Stellantis Garage</span>}
+        <Link
+          href="/"
+          className="flex h-16 w-full items-center gap-2 font-semibold"
+        >
+          {/* <Wrench className="h-6 w-6 shrink-0" />
+          <span className="text-lg">Stellantis Garage</span> */}
+          <Image
+            src={"/stellantis-banner.jpg"}
+            alt="Stellantis Garage"
+            width={1000}
+            height={600}
+            className="h-auto w-full object-cover"
+          />
         </Link>
       </SidebarHeader>
 
@@ -79,7 +100,7 @@ export default function AppSidebar({ userRole }: AppSidebarProps) {
               >
                 <Link href={item.href}>
                   <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                  {open && <span>{item.label}</span>}
+                  <span>{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

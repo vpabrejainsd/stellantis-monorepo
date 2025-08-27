@@ -42,8 +42,6 @@ def get_dynamic_task_estimate(task_id, engineer_id, conn=None):
             else:
                 weight = 0.3
             final_estimate = (engineer_avg_time * weight) + (standard_estimate * (1 - weight))
-            print(f"  - Task {task_id} (Eng: {engineer_id}, Level: {experience_level}): Blending personal avg ({engineer_avg_time:.0f}) and standard time ({standard_estimate}) with {weight*100:.0f}% weight.")
-        
         return True, round(final_estimate)
 
     finally:

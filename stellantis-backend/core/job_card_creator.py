@@ -42,23 +42,32 @@ JOB_TO_TASKS_MAPPING = {
 
 def get_next_job_id_from_db():
     """
-    Retrieves the maximum Job_Id currently in the database,
-    increments it, and returns it. Handles empty table.
+    Retrieves the maximum Job_Id from both job_card and job_history tables,
+    increments it, and returns it. Handles empty tables gracefully.
     """
     conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT MAX(CAST(SUBSTR(Job_Id, 4) AS INTEGER)) FROM job_card")
-        max_id = cursor.fetchone()[0]
         
-        # If no records exist, start from 1, otherwise increment max_id
+        # Combine Job_Ids from both tables, extract numeric part, and find the max
+        query = """
+        SELECT MAX(job_num) FROM (
+            SELECT CAST(SUBSTR(Job_Id, 4) AS INTEGER) AS job_num FROM job_card
+            UNION ALL
+            SELECT CAST(SUBSTR(Job_ID, 4) AS INTEGER) AS job_num FROM job_history
+        )
+        """
+        cursor.execute(query)
+        max_id = cursor.fetchone()[0]
+
         next_int_id = (max_id if max_id is not None else 0) + 1
         return f"JOB{next_int_id}"
+
     except sqlite3.Error as e:
         print(f"Error getting next Job_Id: {e}")
-        # Fallback to a timestamp-based ID or raise an error
-        return f"JOB{int(datetime.now().timestamp())}" 
+        return f"JOB{int(datetime.now().timestamp())}"  # Fallback to timestamp ID
+
     finally:
         if conn:
             conn.close()
@@ -80,7 +89,6 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
     job_id_with_prefix = get_next_job_id_from_db() 
     
     for task_id in tasks_to_perform:
-        print(task_id)
         task_info = TASKS_DATA.get(task_id)
         if not task_info:
             continue
@@ -116,8 +124,6 @@ def create_job_from_ui_input(job_name, vin, make, model, mileage, urgency, selec
     finally:
         if conn:
             conn.close()
-    
-
 
 if __name__ == '__main__':
     # This simulates the data coming from the UI form

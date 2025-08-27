@@ -23,3 +23,14 @@ services:
       - ./stellantis-backend:/app
     ports:
       - "4001:4001"
+
+
+  haproxy:
+    build:
+      context: ./haproxy-router
+    container_name: haproxy-router
+    ports:
+      - "4445:4445"
+    volumes:
+      - ./haproxy-router/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    restart: always

@@ -20,11 +20,7 @@ import AppSidebar from "./sidebar";
 import { Breadcrumb } from "../ui/breadcrumb";
 import { useSidebar } from "../ui/sidebar";
 
-interface HeaderProps {
-  userRole: string;
-}
-
-export default function Header({ userRole }: HeaderProps) {
+export default function Header() {
   const { open, toggleSidebar } = useSidebar();
   return (
     // Add `sticky top-0 z-10` to make the header stick to the top.

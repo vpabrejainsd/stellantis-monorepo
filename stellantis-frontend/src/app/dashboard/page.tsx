@@ -1,17 +1,15 @@
 "use client";
 
 import ManagerDashboard from "@/components/dashboard/manager-dashboard";
+import EngineerDashboard from "@/components/dashboard/engineer-dashboard";
+import { useUserContext } from "@/contexts/user-context";
 
-const DashboardLoadingSkeleton = () => {
-  return (
-    <div className="flex items-center justify-center p-8">
-      <p className="text-muted-foreground">Loading your dashboard...</p>
-    </div>
-  );
-};
+export default function DashboardPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+  const { user } = useUserContext();
 
-const DashboardPage = () => {
-  return <ManagerDashboard />;
-};
+  if (!user) return null; // Could add a fallback here
 
-export default DashboardPage;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  return user.role === "manager" ? <ManagerDashboard /> : <EngineerDashboard />;
+}
